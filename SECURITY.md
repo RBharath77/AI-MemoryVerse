@@ -34,3 +34,4 @@ AI-MemoryVerse is built on zero-trust principles:
 ### 3.3 Storage Security
 - Presigned upload and download URLs have short expiration windows (max 15 minutes).
 - Sensitive fields in the database (such as integration OAuth tokens) are encrypted at rest using AES-GCM (via `cryptography.fernet`).
+

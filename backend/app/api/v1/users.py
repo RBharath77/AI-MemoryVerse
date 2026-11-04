@@ -6,6 +6,7 @@ from app.core.database import get_db
 from app.models.user import User
 from app.schemas.common import APIResponse
 from app.schemas.user import UserResponse, UserUpdateRequest
+from app.services.auth_service import AuthService
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -45,4 +46,21 @@ async def update_current_user_profile(
     return APIResponse(
         success=True,
         data=UserResponse.model_validate(current_user),
+    )
+
+
+@router.delete("/me", response_model=APIResponse[dict])
+async def delete_current_user_account(
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_db),
+):
+    """GDPR-compliant permanent account deletion with cascade cleanup."""
+    await AuthService.delete_user_account(db, current_user.id)
+    return APIResponse(
+        success=True,
+        data={
+            "message": (
+                "User account and all associated personal data have been permanently deleted."
+            )
+        },
     )

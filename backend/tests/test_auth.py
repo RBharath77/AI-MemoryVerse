@@ -142,3 +142,105 @@ async def test_logout(client: AsyncClient, auth_headers: dict):
     response = await client.post("/api/v1/auth/logout", headers=auth_headers)
     assert response.status_code == 200
     assert response.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_forgot_and_reset_password(client: AsyncClient):
+    # Register user
+    reg_payload = {
+        "email": "resetuser@memoryverse.ai",
+        "password": "OldPassword123!",
+        "full_name": "Reset Tester",
+    }
+    await client.post("/api/v1/auth/register", json=reg_payload)
+
+    # Request password reset
+    forgot_res = await client.post(
+        "/api/v1/auth/forgot-password",
+        json={"email": "resetuser@memoryverse.ai"},
+    )
+    assert forgot_res.status_code == 200
+    debug_token = forgot_res.json()["data"]["debug_token"]
+    assert debug_token
+
+    # Reset password using token
+    reset_res = await client.post(
+        "/api/v1/auth/reset-password",
+        json={
+            "token": debug_token,
+            "new_password": "BrandNewPassword999!",
+        },
+    )
+    assert reset_res.status_code == 200
+    assert reset_res.json()["success"] is True
+
+    # Old password should now fail
+    old_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "resetuser@memoryverse.ai", "password": "OldPassword123!"},
+    )
+    assert old_login.status_code == 401
+
+    # New password should succeed
+    new_login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "resetuser@memoryverse.ai", "password": "BrandNewPassword999!"},
+    )
+    assert new_login.status_code == 200
+    assert new_login.json()["success"] is True
+
+
+@pytest.mark.asyncio
+async def test_request_and_verify_email(client: AsyncClient, auth_headers: dict):
+    # Request verification token
+    req_res = await client.post(
+        "/api/v1/auth/request-verification",
+        headers=auth_headers,
+    )
+    assert req_res.status_code == 200
+    debug_token = req_res.json()["data"]["debug_token"]
+    assert debug_token
+
+    # Verify email
+    verify_res = await client.post(
+        "/api/v1/auth/verify-email",
+        json={"token": debug_token},
+    )
+    assert verify_res.status_code == 200
+    assert verify_res.json()["success"] is True
+
+    # Check profile to verify is_verified is now True
+    me_res = await client.get("/api/v1/auth/me", headers=auth_headers)
+    assert me_res.status_code == 200
+    assert me_res.json()["data"]["is_verified"] is True
+
+
+@pytest.mark.asyncio
+async def test_update_and_delete_user_account(client: AsyncClient, auth_headers: dict):
+    # Update profile
+    patch_payload = {
+        "full_name": "Updated Name",
+        "profile": {
+            "bio": "AI Researcher and Knowledge Architect",
+            "preferences": {"theme": "dark", "stream_responses": True},
+        },
+    }
+    patch_res = await client.patch(
+        "/api/v1/users/me",
+        json=patch_payload,
+        headers=auth_headers,
+    )
+    assert patch_res.status_code == 200
+    data = patch_res.json()["data"]
+    assert data["full_name"] == "Updated Name"
+    assert data["profile"]["bio"] == "AI Researcher and Knowledge Architect"
+    assert data["profile"]["preferences"]["theme"] == "dark"
+
+    # Delete account
+    del_res = await client.delete("/api/v1/users/me", headers=auth_headers)
+    assert del_res.status_code == 200
+    assert del_res.json()["success"] is True
+
+    # Verify account no longer exists
+    verify_res = await client.get("/api/v1/auth/me", headers=auth_headers)
+    assert verify_res.status_code == 401

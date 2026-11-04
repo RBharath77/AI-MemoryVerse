@@ -167,3 +167,4 @@ services_redis:
     name: memoryverse-queue
     plan: standard
     ipAllowList: [] # internal access only
+

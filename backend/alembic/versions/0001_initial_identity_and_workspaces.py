@@ -92,10 +92,41 @@ def upgrade() -> None:
     op.create_index(op.f("ix_workspace_members_workspace_id"), "workspace_members", ["workspace_id"])
     op.create_index(op.f("ix_workspace_members_user_id"), "workspace_members", ["user_id"])
 
+    # 6. user_verification_tokens
+    op.create_table(
+        "user_verification_tokens",
+        sa.Column("id", sa.String(length=36), primary_key=True),
+        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("token_hash", sa.String(length=64), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index(op.f("ix_user_verification_tokens_user_id"), "user_verification_tokens", ["user_id"])
+    op.create_index(op.f("ix_user_verification_tokens_token_hash"), "user_verification_tokens", ["token_hash"], unique=True)
+
+    # 7. password_reset_tokens
+    op.create_table(
+        "password_reset_tokens",
+        sa.Column("id", sa.String(length=36), primary_key=True),
+        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column("token_hash", sa.String(length=64), nullable=False),
+        sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.false()),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+        sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index(op.f("ix_password_reset_tokens_user_id"), "password_reset_tokens", ["user_id"])
+    op.create_index(op.f("ix_password_reset_tokens_token_hash"), "password_reset_tokens", ["token_hash"], unique=True)
+
 
 def downgrade() -> None:
+    op.drop_table("password_reset_tokens")
+    op.drop_table("user_verification_tokens")
     op.drop_table("workspace_members")
     op.drop_table("workspaces")
     op.drop_table("user_sessions")
     op.drop_table("user_profiles")
     op.drop_table("users")
+

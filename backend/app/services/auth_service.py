@@ -1,4 +1,5 @@
 import re
+import secrets
 import uuid
 from datetime import UTC, datetime, timedelta
 
@@ -16,7 +17,13 @@ from app.core.security import (
     hash_token,
     verify_password,
 )
-from app.models.user import User, UserProfile, UserSession
+from app.models.user import (
+    PasswordResetToken,
+    User,
+    UserProfile,
+    UserSession,
+    UserVerificationToken,
+)
 from app.models.workspace import (
     Workspace,
     WorkspaceMember,
@@ -305,3 +312,134 @@ class AuthService:
             await db.commit()
             return True
         return False
+
+    @staticmethod
+    async def request_password_reset(db: AsyncSession, email: str) -> str:
+        """Create a password reset token for the given user email."""
+        query = select(User).where(User.email == email.lower())
+        res = await db.execute(query)
+        user = res.scalar_one_or_none()
+        if not user:
+            # Prevent user enumeration by returning a fake token or generic success
+            return "reset_token_dispatched"
+
+        raw_token = secrets.token_urlsafe(32)
+        token_record = PasswordResetToken(
+            user_id=user.id,
+            token_hash=hash_token(raw_token),
+            expires_at=datetime.now(UTC) + timedelta(hours=1),
+            is_used=False,
+        )
+        db.add(token_record)
+        await db.commit()
+        return raw_token
+
+    @staticmethod
+    async def reset_password(db: AsyncSession, raw_token: str, new_password: str) -> bool:
+        """Verify token and update password, revoking existing sessions."""
+        hashed = hash_token(raw_token)
+        query = select(PasswordResetToken).where(
+            PasswordResetToken.token_hash == hashed,
+            PasswordResetToken.is_used.is_(False),
+        )
+        res = await db.execute(query)
+        token_record = res.scalar_one_or_none()
+
+        if not token_record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid or expired reset token.",
+            )
+
+        expires_at = token_record.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+
+        if expires_at < datetime.now(UTC):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Reset token has expired.",
+            )
+
+        user_query = select(User).where(User.id == token_record.user_id)
+        user = (await db.execute(user_query)).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        # Update password
+        user.hashed_password = hash_password(new_password)
+        token_record.is_used = True
+
+        # Invalidate all active sessions for security
+        session_query = select(UserSession).where(
+            UserSession.user_id == user.id,
+            UserSession.is_revoked.is_(False),
+        )
+        sessions = (await db.execute(session_query)).scalars().all()
+        for s in sessions:
+            s.is_revoked = True
+
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def request_email_verification(db: AsyncSession, user_id: str) -> str:
+        raw_token = secrets.token_urlsafe(32)
+        record = UserVerificationToken(
+            user_id=user_id,
+            token_hash=hash_token(raw_token),
+            expires_at=datetime.now(UTC) + timedelta(hours=24),
+            is_used=False,
+        )
+        db.add(record)
+        await db.commit()
+        return raw_token
+
+    @staticmethod
+    async def verify_email(db: AsyncSession, raw_token: str) -> bool:
+        hashed = hash_token(raw_token)
+        query = select(UserVerificationToken).where(
+            UserVerificationToken.token_hash == hashed,
+            UserVerificationToken.is_used.is_(False),
+        )
+        res = await db.execute(query)
+        record = res.scalar_one_or_none()
+
+        if not record:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid verification token.",
+            )
+
+        expires_at = record.expires_at
+        if expires_at.tzinfo is None:
+            expires_at = expires_at.replace(tzinfo=UTC)
+
+        if expires_at < datetime.now(UTC):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Verification token has expired.",
+            )
+
+        user_query = select(User).where(User.id == record.user_id)
+        user = (await db.execute(user_query)).scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        user.is_verified = True
+        record.is_used = True
+        await db.commit()
+        return True
+
+    @staticmethod
+    async def delete_user_account(db: AsyncSession, user_id: str) -> bool:
+        """Cascade permanent deletion of user account and related records."""
+        query = select(User).where(User.id == user_id)
+        res = await db.execute(query)
+        user = res.scalar_one_or_none()
+        if not user:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
+
+        await db.delete(user)
+        await db.commit()
+        return True

@@ -80,3 +80,4 @@
   3. Memory extraction and RAG retrieval pipelines.
   4. Document ingestion and chunking logic.
   5. Failure recovery & idempotency.
+

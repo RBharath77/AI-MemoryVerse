@@ -110,3 +110,4 @@ flowchart TD
 - Every database query in services must filter by `workspace_id`.
 - Foreign keys and unique composite constraints enforce multi-tenant isolation at the database schema level.
 - Authorization middleware enforces Role-Based Access Control (RBAC): `Owner`, `Admin`, `Member`, `Viewer`.
+

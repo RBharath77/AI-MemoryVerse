@@ -7,10 +7,13 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.models.user import User
 from app.schemas.auth import (
+    ForgotPasswordRequest,
     LoginRequest,
     RefreshTokenRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     TokenResponse,
+    VerifyEmailRequest,
 )
 from app.schemas.common import APIResponse
 from app.schemas.user import UserResponse
@@ -137,4 +140,62 @@ async def get_me(
     return APIResponse(
         success=True,
         data=UserResponse.model_validate(current_user),
+    )
+
+
+@router.post("/forgot-password", response_model=APIResponse[dict])
+async def forgot_password(
+    req: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    token = await AuthService.request_password_reset(db, req.email)
+    return APIResponse(
+        success=True,
+        data={
+            "message": "If this email is registered, a password reset link has been dispatched.",
+            "debug_token": token if settings.DEBUG else None,
+        },
+    )
+
+
+@router.post("/reset-password", response_model=APIResponse[dict])
+async def reset_password(
+    req: ResetPasswordRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    await AuthService.reset_password(db, req.token, req.new_password)
+    return APIResponse(
+        success=True,
+        data={
+            "message": (
+                "Password has been successfully reset. Please log in with your new credentials."
+            )
+        },
+    )
+
+
+@router.post("/verify-email", response_model=APIResponse[dict])
+async def verify_email(
+    req: VerifyEmailRequest,
+    db: AsyncSession = Depends(get_db),
+):
+    await AuthService.verify_email(db, req.token)
+    return APIResponse(
+        success=True,
+        data={"message": "Email address successfully verified."},
+    )
+
+
+@router.post("/request-verification", response_model=APIResponse[dict])
+async def request_verification(
+    current_user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    token = await AuthService.request_email_verification(db, current_user.id)
+    return APIResponse(
+        success=True,
+        data={
+            "message": "Verification link dispatched to registered email.",
+            "debug_token": token if settings.DEBUG else None,
+        },
     )

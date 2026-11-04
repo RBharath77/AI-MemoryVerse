@@ -29,3 +29,4 @@
 - **Multi-Tenant Security:** Zero cross-tenant data leakage verified across all API endpoints through automated authorization test suites.
 - **Async Execution:** 100% of CPU-intensive document extraction and embedding generation tasks offloaded from HTTP threads to dedicated background workers.
 - **Zero Mock Fallback:** Local development and CI pipelines execute with automated mock adapters when live credentials are absent, guaranteeing high developer velocity.
+

@@ -120,3 +120,4 @@ volumes:
 networks:
   memoryverse_net:
     driver: bridge
+

@@ -75,3 +75,4 @@ After deployment completes, verify:
 3. User registration and login flow works at `https://<web-url>/register`.
 4. Create a test memory and verify instant retrieval in the Memory Vault.
 5. Upload a document (PDF or Markdown) and confirm worker extracts chunks and creates embeddings.
+

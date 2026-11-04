@@ -41,3 +41,4 @@ AI-MemoryVerse employs an automated testing strategy ensuring every core layer i
 - **Retrieval Precision@K & Recall@K**: Validates whether the top $K$ retrieved chunks contain the ground-truth answers.
 - **Answer Groundedness**: Verifies that every assertion made by the LLM is directly supported by retrieved context.
 - **Citation Precision**: Ensures every citation tag links to an actually retrieved and relevant chunk.
+

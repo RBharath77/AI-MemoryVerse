@@ -46,3 +46,4 @@
 - **Context:** Web applications running on Render possess ephemeral filesystems. File uploads cannot be saved to the local disk in production.
 - **Decision:** Implement an S3-compatible storage adapter with presigned upload/download URLs (compatible with AWS S3, Cloudflare R2, MinIO, or local disk fallback for tests).
 - **Consequences:** Zero risk of data loss on container restarts; direct client uploads reduce load on API servers.
+

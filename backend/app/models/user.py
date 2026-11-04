@@ -134,3 +134,55 @@ class UserSession(Base, TimestampMixin):
     is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="sessions")
+
+
+class UserVerificationToken(Base, TimestampMixin):
+    __tablename__ = "user_verification_tokens"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    user: Mapped["User"] = relationship("User")
+
+
+class PasswordResetToken(Base, TimestampMixin):
+    __tablename__ = "password_reset_tokens"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    token_hash: Mapped[str] = mapped_column(
+        String(64),
+        unique=True,
+        index=True,
+        nullable=False,
+    )
+    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    is_used: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+
+    user: Mapped["User"] = relationship("User")

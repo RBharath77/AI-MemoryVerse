@@ -110,3 +110,4 @@ export const useAuthStore = create<AuthState>((set) => ({
     set({ isLoading: false });
   },
 }));
+
