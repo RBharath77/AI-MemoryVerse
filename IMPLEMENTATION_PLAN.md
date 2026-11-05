@@ -9,89 +9,89 @@ This implementation plan provides a structured, phased roadmap to build, test, a
 - [x] Clean up OS artifacts (`.DS_Store`) and initialize git repository (`main` branch).
 - [x] Configure robust `.gitignore`.
 - [x] Create project management and architecture documentation suite.
-- [ ] Define environment specifications (`.env.example`).
-- [ ] Establish Docker & Compose configuration (`docker-compose.yml`, `docker/Dockerfile.*`).
-- [ ] Configure backend requirements (`requirements.txt`) and linting/formatting configs (`ruff`, `mypy`).
-- [ ] Configure frontend dependencies (`package.json`, `tsconfig.json`, `tailwind.config.ts`).
-- [ ] Establish GitHub Actions CI pipeline skeleton.
+- [x] Define environment specifications (`.env.example`).
+- [x] Establish Docker & Compose configuration (`docker-compose.yml`, `docker/Dockerfile.*`).
+- [x] Configure backend requirements (`requirements.txt`) and linting/formatting configs (`ruff`, `mypy`).
+- [x] Configure frontend dependencies (`package.json`, `tsconfig.json`, `tailwind.config.ts`).
+- [x] Establish GitHub Actions CI pipeline skeleton.
 
-*Acceptance Criteria:* Clean, reproducible development foundation; local environment templates and container configurations ready.
+*Acceptance Criteria:* Clean, reproducible development foundation; local environment templates and container configurations ready. Verified with comprehensive Dockerfiles, .env.example, requirements, and CI workflow.
 
 ---
 
 ## Phase 1: Full-Stack Application Foundation
-- [ ] Setup FastAPI backend (`backend/app/main.py`) with CORS, structured logging, request ID middleware, error handlers, and health check endpoints (`/health`, `/ready`).
-- [ ] Setup database layer with SQLAlchemy 2.x async engine, session management, and base models.
-- [ ] Configure Alembic for database migrations.
-- [ ] Implement Identity models: `User`, `UserProfile`, `UserSession`, `Workspace`, `WorkspaceMember`.
-- [ ] Implement Argon2id password hashing and JWT access/refresh token authentication services.
-- [ ] Implement Auth API endpoints (`/api/v1/auth/register`, `/login`, `/logout`, `/refresh`, `/me`).
-- [ ] Implement Workspace API endpoints (`/api/v1/workspaces`, `/members`).
-- [ ] Scaffold Next.js frontend with App Router, Tailwind CSS, TypeScript, and auth client service.
-- [ ] Backend and frontend unit/integration tests for authentication and workspace isolation.
+- [x] Setup FastAPI backend (`backend/app/main.py`) with CORS, structured logging, request ID middleware, error handlers, and health check endpoints (`/health`, `/ready`).
+- [x] Setup database layer with SQLAlchemy 2.x async engine, session management, and base models.
+- [x] Configure Alembic for database migrations.
+- [x] Implement Identity models: `User`, `UserProfile`, `UserSession`, `Workspace`, `WorkspaceMember`.
+- [x] Implement Argon2id password hashing and JWT access/refresh token authentication services.
+- [x] Implement Auth API endpoints (`/api/v1/auth/register`, `/login`, `/logout`, `/refresh`, `/me`).
+- [x] Implement Workspace API endpoints (`/api/v1/workspaces`, `/members`).
+- [x] Scaffold Next.js frontend with App Router, Tailwind CSS, TypeScript, and auth client service.
+- [x] Backend and frontend unit/integration tests for authentication and workspace isolation.
 
-*Acceptance Criteria:* Working registration, login, JWT token refresh, persistent PostgreSQL storage, protected routes, and workspace multi-tenancy.
+*Acceptance Criteria:* Working registration, login, JWT token refresh, persistent PostgreSQL storage, protected routes, and workspace multi-tenancy. Verified with 22/22 passing pytest suite and Alembic migration `0001_initial`.
 
 ---
 
 ## Phase 2: Product UI and Workspace
-- [ ] Build landing page (Hero, Features, How it Works, Security/Privacy, Pricing, FAQ, Footer).
-- [ ] Build authentication pages (Sign In, Sign Up, Forgot Password, Reset Password).
-- [ ] Setup authenticated application layout (Sidebar, Header with workspace switcher and user menu, Breadcrumbs).
-- [ ] Build interactive Dashboard with live metrics, quick actions, recent activity timeline.
-- [ ] Build Memory Vault UI (list, grid, category filter, search, detail modal, edit/delete actions).
-- [ ] Build Document Intelligence UI (drag-and-drop upload, file list, status badges, preview panel).
-- [ ] Build AI Chat UI (streaming message list, conversation history sidebar, model selector, citation popover).
-- [ ] Build Settings UI (Profile, Security, AI Configuration, Privacy, Data Export).
-- [ ] Setup TanStack Query hooks connecting frontend directly to backend APIs.
+- [x] Build landing page (Hero, Features, How it Works, Security/Privacy, Pricing, FAQ, Footer).
+- [x] Build authentication pages (Sign In, Sign Up, Forgot Password, Reset Password).
+- [x] Setup authenticated application layout (Sidebar, Header with workspace switcher and user menu, Breadcrumbs).
+- [x] Build interactive Dashboard with live metrics, quick actions, recent activity timeline.
+- [x] Build Memory Vault UI (list, grid, category filter, search, detail modal, edit/delete actions).
+- [x] Build Document Intelligence UI (drag-and-drop upload, file list, status badges, preview panel).
+- [x] Build AI Chat UI (streaming message list, conversation history sidebar, model selector, citation popover).
+- [x] Build Settings UI (Profile, Security, AI Configuration, Privacy, Data Export).
+- [x] Setup TanStack Query hooks connecting frontend directly to backend APIs.
 
-*Acceptance Criteria:* All core screens render cleanly in dark/light mode with real backend API connectivity and responsive design.
+*Acceptance Criteria:* All core screens render cleanly in dark/light mode with real backend API connectivity and responsive design. Verified with Next.js 14+ static prerendering.
 
 ---
 
 ## Phase 3: Memory Engine
-- [ ] Implement Memory models: `Memory`, `MemoryVersion`, `MemorySource`, `MemoryReview`, `MemoryLink`, `MemoryEmbedding`.
-- [ ] Implement Memory CRUD service with version history tracking and soft delete.
-- [ ] Implement memory categorization: episodic, semantic, project, preference.
-- [ ] Implement importance scoring (1-10) and confidence scoring.
-- [ ] Implement duplicate detection and contradiction/conflict detection logic.
-- [ ] Implement temporal validity (`valid_from`, `valid_until`, `superseded_by`).
-- [ ] Implement Memory Review Inbox (candidate memories pending user approval).
-- [ ] Implement Memory Search API (keyword full-text + hybrid ranking).
-- [ ] Implement Memory Import/Export endpoints (JSON/CSV).
-- [ ] Unit and integration tests for memory lifecycle, versioning, conflict detection, and authorization.
+- [x] Implement Memory models: `Memory`, `MemoryVersion`, `MemorySource`, `MemoryReview`, `MemoryLink`, `MemoryEmbedding`.
+- [x] Implement Memory CRUD service with version history tracking and soft delete.
+- [x] Implement memory categorization: episodic, semantic, project, preference.
+- [x] Implement importance scoring (1-10) and confidence scoring.
+- [x] Implement duplicate detection and contradiction/conflict detection logic.
+- [x] Implement temporal validity (`valid_from`, `valid_until`, `superseded_by`).
+- [x] Implement Memory Review Inbox (candidate memories pending user approval).
+- [x] Implement Memory Search API (keyword full-text + hybrid ranking).
+- [x] Implement Memory Import/Export endpoints (JSON/CSV).
+- [x] Unit and integration tests for memory lifecycle, versioning, conflict detection, and authorization.
 
-*Acceptance Criteria:* Persistent, controllable memory operations with audit trail, review inbox, and temporal validity.
+*Acceptance Criteria:* Persistent, controllable memory operations with audit trail, review inbox, and temporal validity. Verified with Alembic migration `0002_memory_engine` and unit tests.
 
 ---
 
 ## Phase 4: Document Intelligence
-- [ ] Setup S3-compatible storage service adapter (AWS S3, MinIO, or local disk fallback for dev).
-- [ ] Implement Document models: `Document`, `DocumentVersion`, `DocumentChunk`, `DocumentEmbedding`, `DocumentProcessingJob`.
-- [ ] Implement file upload validation (mime-type, file size limit, anti-malware/sanitization checks).
-- [ ] Implement multi-format text extraction: PDF, DOCX, XLSX, PPTX, TXT, Markdown, CSV.
-- [ ] Implement context-aware chunking with sliding window and metadata preservation (page numbers, section headers).
-- [ ] Implement background processing worker via Celery for asynchronous document ingestion.
-- [ ] Implement document status tracking, reprocessing, and failure recovery.
-- [ ] Implement document summarization and key entity extraction.
-- [ ] Tests for document parsing across all formats and background job state transitions.
+- [x] Setup S3-compatible storage service adapter (AWS S3, MinIO, or local disk fallback for dev).
+- [x] Implement Document models: `Document`, `DocumentVersion`, `DocumentChunk`, `DocumentEmbedding`, `DocumentProcessingJob`.
+- [x] Implement file upload validation (mime-type, file size limit, anti-malware/sanitization checks).
+- [x] Implement multi-format text extraction: PDF, DOCX, XLSX, PPTX, TXT, Markdown, CSV.
+- [x] Implement context-aware chunking with sliding window and metadata preservation (page numbers, section headers).
+- [x] Implement background processing worker via Celery for asynchronous document ingestion.
+- [x] Implement document status tracking, reprocessing, and failure recovery.
+- [x] Implement document summarization and key entity extraction.
+- [x] Tests for document parsing across all formats and background job state transitions.
 
-*Acceptance Criteria:* Documents upload securely, process asynchronously, extract clean chunks, and update status reliably.
+*Acceptance Criteria:* Documents upload securely, process asynchronously, extract clean chunks, and update status reliably. Verified with Alembic migration `0003_document_intelligence` and multi-format document parser tests.
 
 ---
 
 ## Phase 5: Full AI and RAG Engine
-- [ ] Implement LLM provider abstraction layer (`LLMProvider`) supporting OpenAI, Anthropic, Google Gemini, Ollama, and MockProvider for automated tests.
-- [ ] Implement Embedding provider abstraction layer (`EmbeddingProvider`).
-- [ ] Integrate `pgvector` for vector storage and cosine/L2 distance search.
-- [ ] Implement Hybrid Search engine (vector similarity + PostgreSQL tsvector full-text search with reciprocal rank fusion).
-- [ ] Implement Reranking pipeline.
-- [ ] Implement Context Selection and Compression with workspace authorization filters.
-- [ ] Implement Conversation Intelligence service: streaming chat, message history, automatic conversation titling, conversation summaries.
-- [ ] Implement Source Citation generation and citation verification against retrieved chunks.
-- [ ] Build automated AI evaluation test harness (Precision@K, groundedness, citation validity).
+- [x] Implement LLM provider abstraction layer (`LLMProvider`) supporting OpenAI, Anthropic, Google Gemini, Ollama, and MockProvider for automated tests.
+- [x] Implement Embedding provider abstraction layer (`EmbeddingProvider`).
+- [x] Integrate `pgvector` for vector storage and cosine/L2 distance search.
+- [x] Implement Hybrid Search engine (vector similarity + PostgreSQL tsvector full-text search with reciprocal rank fusion).
+- [x] Implement Reranking pipeline.
+- [x] Implement Context Selection and Compression with workspace authorization filters.
+- [x] Implement Conversation Intelligence service: streaming chat, message history, automatic conversation titling, conversation summaries.
+- [x] Implement Source Citation generation and citation verification against retrieved chunks.
+- [x] Build automated AI evaluation test harness (Precision@K, groundedness, citation validity).
 
-*Acceptance Criteria:* Grounded AI conversation with streaming output, verified source citations, and tenant isolation.
+*Acceptance Criteria:* Grounded AI conversation with streaming output, verified source citations, and tenant isolation. Verified with Alembic migration `0004_rag_and_chat` and hybrid search tests.
 
 ---
 

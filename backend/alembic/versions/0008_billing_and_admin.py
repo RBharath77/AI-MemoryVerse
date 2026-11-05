@@ -152,3 +152,4 @@ def downgrade() -> None:
     op.drop_table("audit_events")
     op.drop_table("invoices")
     op.drop_table("subscriptions")
+

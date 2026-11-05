@@ -134,3 +134,4 @@ def downgrade() -> None:
     op.drop_table("api_tokens")
     op.drop_table("agent_actions")
     op.drop_table("agent_tasks")
+
