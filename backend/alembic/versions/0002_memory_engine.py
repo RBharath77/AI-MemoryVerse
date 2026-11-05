@@ -117,3 +117,4 @@ def downgrade() -> None:
     op.drop_table("memory_reviews")
     op.drop_table("memory_versions")
     op.drop_table("memories")
+

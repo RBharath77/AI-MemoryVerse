@@ -1,7 +1,13 @@
 from app.core.database import Base
+from app.models.document import (
+    Document,
+    DocumentChunk,
+    DocumentStatus,
+)
 from app.models.memory import (
     Memory,
     MemoryCategory,
+    MemoryFeedback,
     MemoryLink,
     MemoryReview,
     MemoryStatus,
@@ -38,4 +44,8 @@ __all__ = [
     "MemoryVersion",
     "MemoryReview",
     "MemoryLink",
+    "MemoryFeedback",
+    "Document",
+    "DocumentChunk",
+    "DocumentStatus",
 ]

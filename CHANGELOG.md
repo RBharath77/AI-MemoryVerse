@@ -54,3 +54,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Alembic database migration `0002_memories` for all Phase 3 tables.
   - 8 new comprehensive automated tests in `tests/test_memory_engine.py` (total 30 passing backend tests).
   - Frontend Review Inbox updated with real review action handlers, conflict warnings, and correction modal.
+
+- **Phase 4 — Document Intelligence**:
+  - Pluggable Object Storage Provider adapter in `app/core/storage.py` (`BaseStorageProvider`, `LocalStorageProvider`, `S3StorageProvider`).
+  - Document parser in `app/ai/document_parser.py` supporting PDF (`pypdf`), Word (`docx`), Text/Markdown, CSV, JSON, and HTML.
+  - Chunking engine in `app/ai/chunker.py` with fixed-size with token overlap, paragraph-based, and markdown semantic header-aware chunking.
+  - Asynchronous background worker setup with Celery and Redis in `app/workers/celery_app.py` and `app/workers/tasks.py`.
+  - Database models for `Document` and `DocumentChunk` with status tracking (`completed`, `processing`, `failed`), word/token counts, and summary.
+  - Alembic database migration `0003_documents` for documents and document_chunks.
+  - REST endpoints in `app/api/v1/documents.py` for `/upload`, `/retry`, `/chunks`, `/download`, and CRUD operations.
+  - 8 new comprehensive automated tests in `tests/test_document_intelligence.py` (total 38 passing backend tests).
+  - Frontend Document Library page connected to live APIs with multipart upload, status badges, chunk inspection modal, retry, and deletion.

@@ -8,6 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.api.v1.auth import router as auth_router
+from app.api.v1.documents import router as documents_router
 from app.api.v1.health import router as health_router
 from app.api.v1.memories import router as memories_router
 from app.api.v1.memory_reviews import router as memory_reviews_router
@@ -121,6 +122,7 @@ app.include_router(users_router, prefix="/api/v1")
 app.include_router(workspaces_router, prefix="/api/v1")
 app.include_router(memories_router, prefix="/api/v1")
 app.include_router(memory_reviews_router, prefix="/api/v1")
+app.include_router(documents_router, prefix="/api/v1")
 
 
 @app.get("/")
