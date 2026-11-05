@@ -69,10 +69,20 @@ Render deploys the application using a declarative infrastructure specification 
 ---
 
 ## 3. Production Verification & Smoke Testing
-After deployment completes, verify:
-1. `GET https://<api-url>/health` returns `{"status": "healthy"}`.
-2. `GET https://<api-url>/ready` returns `{"database": "connected", "redis": "connected"}`.
-3. User registration and login flow works at `https://<web-url>/register`.
-4. Create a test memory and verify instant retrieval in the Memory Vault.
-5. Upload a document (PDF or Markdown) and confirm worker extracts chunks and creates embeddings.
+After deployment completes, run the automated smoke test suite:
+
+```bash
+python scripts/smoke_test.py --base-url https://memoryverse-api.onrender.com
+```
+
+The script verifies:
+1. `GET /health` returns `{"status": "healthy"}`.
+2. `GET /ready` returns `{"status": "ready", "database": "connected"}`.
+3. User registration and authentication token issuance at `/api/v1/auth/register`.
+4. Memory creation, vector embedding, and status approval at `/api/v1/memories`.
+5. Hybrid search retrieval engine at `/api/v1/search/hybrid`.
+6. Knowledge graph entity & relationship extraction at `/api/v1/graph/extract`.
+7. Real-time quota metering and plan checks at `/api/v1/billing/usage`.
+8. Controlled agent registered tool suite inspection at `/api/v1/agents/tools`.
+
 

@@ -145,4 +145,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
     - Broken Access Control defense rejecting unauthenticated requests with HTTP 401 across all protected endpoints.
   - Full test suite verified at 84/84 passing backend tests (100% pass rate).
 
+- **Phase 11 — Production & Render Deployment**:
+  - Declarative infrastructure-as-code specification in `render.yaml` defining frontend web service, FastAPI backend API, Celery background worker, PostgreSQL 16 database, and managed Redis message queue.
+  - Multi-stage production container definitions in `docker/Dockerfile.backend`, `docker/Dockerfile.frontend`, and `docker/Dockerfile.worker` ensuring minimal image footprints and security boundaries.
+  - Automated production smoke test verification suite in `scripts/smoke_test.py` running 8 core validation stages against live endpoints.
+  - Comprehensive deployment documentation in `DEPLOYMENT.md` covering native local development, Docker Compose orchestration, and one-click Render Blueprint setup.
+
+
 

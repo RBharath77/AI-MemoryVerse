@@ -152,8 +152,16 @@ services:
       - key: STORAGE_SECRET_KEY
         sync: false
 
+  # ----------------------------------------------------------------------------
+  # 4. REDIS MESSAGE QUEUE & CACHE
+  # ----------------------------------------------------------------------------
+  - type: redis
+    name: memoryverse-queue
+    plan: standard
+    ipAllowList: [] # internal access only
+
 # ------------------------------------------------------------------------------
-# 4. MANAGED DATABASES & QUEUES
+# 5. MANAGED DATABASES
 # ------------------------------------------------------------------------------
 databases:
   - name: memoryverse-db
@@ -162,9 +170,4 @@ databases:
     plan: standard
     postgresMajorVersion: 16
 
-services_redis:
-  - type: redis
-    name: memoryverse-queue
-    plan: standard
-    ipAllowList: [] # internal access only
 
