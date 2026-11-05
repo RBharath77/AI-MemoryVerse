@@ -24,7 +24,9 @@ def get_llm_provider() -> BaseLLMProvider:
             base_url = (
                 settings.LLM_BASE_URL
                 if settings.LLM_BASE_URL
-                else ("https://openrouter.ai/api/v1" if is_openrouter else "https://api.openai.com/v1")
+                else (
+                    "https://openrouter.ai/api/v1" if is_openrouter else "https://api.openai.com/v1"
+                )
             )
             model = settings.LLM_MODEL or "gpt-4o-mini"
             if is_openrouter and not ("/" in model or ":" in model):
@@ -64,7 +66,9 @@ def get_embedding_provider() -> BaseEmbeddingProvider:
             base_url = (
                 settings.EMBEDDING_BASE_URL
                 or settings.LLM_BASE_URL
-                or ("https://openrouter.ai/api/v1" if is_openrouter else "https://api.openai.com/v1")
+                or (
+                    "https://openrouter.ai/api/v1" if is_openrouter else "https://api.openai.com/v1"
+                )
             )
             return OpenAIProvider(
                 api_key=key,
