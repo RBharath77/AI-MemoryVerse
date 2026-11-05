@@ -75,8 +75,7 @@ async def test_agent_task_creation_and_execution(client: AsyncClient, auth_heade
         json={
             "title": "Analyze Python Architecture",
             "goal": (
-                "Search our knowledge vault for Python technologies "
-                "and summarize key advantages."
+                "Search our knowledge vault for Python technologies and summarize key advantages."
             ),
             "steps_limit": 5,
         },

@@ -69,6 +69,7 @@ const navSections = [
     items: [
       { name: "Integrations", href: "/integrations", icon: Blocks },
       { name: "Usage & Billing", href: "/billing", icon: CreditCard },
+      { name: "Admin Telemetry", href: "/admin", icon: ShieldAlert },
       { name: "Security Center", href: "/security", icon: Shield },
       { name: "Settings", href: "/settings", icon: Settings },
     ],

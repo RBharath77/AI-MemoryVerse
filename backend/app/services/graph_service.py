@@ -122,8 +122,7 @@ class GraphService:
         entities = (await db.execute(query)).scalars().all()
 
         results = [
-            (e, len(e.outgoing_relationships) + len(e.incoming_relationships))
-            for e in entities
+            (e, len(e.outgoing_relationships) + len(e.incoming_relationships)) for e in entities
         ]
         return results, total
 
@@ -418,18 +417,18 @@ class GraphService:
         workspace_id: str,
     ) -> GraphAnalyticsResponse:
         entities = list(
-            (
-                await db.execute(
-                    select(GraphEntity).where(GraphEntity.workspace_id == workspace_id)
-                )
-            ).scalars().all()
+            (await db.execute(select(GraphEntity).where(GraphEntity.workspace_id == workspace_id)))
+            .scalars()
+            .all()
         )
         relationships = list(
             (
                 await db.execute(
                     select(GraphRelationship).where(GraphRelationship.workspace_id == workspace_id)
                 )
-            ).scalars().all()
+            )
+            .scalars()
+            .all()
         )
 
         total_entities = len(entities)

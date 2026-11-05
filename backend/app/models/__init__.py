@@ -6,6 +6,12 @@ from app.models.agent import (
     APIToken,
     TaskStatus,
 )
+from app.models.billing import (
+    AuditEvent,
+    Invoice,
+    Subscription,
+    SubscriptionStatus,
+)
 from app.models.chat import (
     ChatMessage,
     Conversation,
@@ -88,4 +94,8 @@ __all__ = [
     "APIToken",
     "TaskStatus",
     "ActionApprovalStatus",
+    "Subscription",
+    "SubscriptionStatus",
+    "Invoice",
+    "AuditEvent",
 ]

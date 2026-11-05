@@ -79,6 +79,17 @@ async def get_current_active_user(
     return current_user
 
 
+async def get_current_active_superuser(
+    current_user: User = Depends(get_current_active_user),
+) -> User:
+    if not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="The user does not have administrative privileges.",
+        )
+    return current_user
+
+
 async def get_current_workspace(
     x_workspace_id: str | None = Header(default=None, alias="X-Workspace-ID"),
     current_user: User = Depends(get_current_active_user),

@@ -190,4 +190,3 @@ async def test_knowledge_graph_multi_tenant_isolation(client: AsyncClient, auth_
     # User B cannot delete User A's entity
     del_res = await client.delete(f"/api/v1/graph/entities/{ent_a_id}", headers=headers_b)
     assert del_res.status_code == 404
-

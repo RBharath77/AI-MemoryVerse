@@ -113,5 +113,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Frontend Controlled Agents management page in `frontend/app/(dashboard)/automation/page.tsx` with urgent approval banners, task progress bars, action audit trail, tool registry drawer, and SSRF webpage importer modal.
   - Frontend Developer API Keys & Integrations Hub in `frontend/app/(dashboard)/integrations/page.tsx` with token table, scope configurator, one-time plaintext key reveal modal, and cURL quickstart documentation.
 
-  - Frontend Research Lab page in `frontend/app/(dashboard)/research/page.tsx` with markdown report reader, key findings, and action items.
-  - Frontend Smart Insights page in `frontend/app/(dashboard)/insights/page.tsx` with proactive knowledge cards and 1-click remediation actions.
+- **Phase 9 — SaaS Product System**:
+  - SaaS subscription models and plan definitions (`Free`, `Personal`, `Pro`, `Team`) with strict quota limits for memory vault count, documents, storage bytes, and AI queries.
+  - Real-time Quota Metering Service in `app/services/billing_service.py` computing live storage size, memory counts, document uploads, and query consumptions.
+  - Pluggable Payment Provider abstraction in `app/services/payment_provider.py` (`BasePaymentProvider`, `StripePaymentProvider`, `SandboxPaymentProvider`).
+  - Automatic invoice generation and lifecycle tracking with unique invoice numbering and paid status.
+  - Admin Console and Telemetry Service in `app/services/admin_service.py` measuring database query latency, cache status, storage health, and background worker queue depths.
+  - Security and operational audit log stream in `app/models/billing.py` (`AuditEvent`) capturing events with IP, user agent, and payload metadata.
+  - Alembic database migration `0008_billing_and_admin` creating `subscriptions`, `invoices`, and `audit_events`.
+  - REST API endpoints for billing (`/api/v1/billing/*`) and admin oversight (`/api/v1/admin/*`).
+  - 9 comprehensive automated tests in `tests/test_billing_and_admin.py` (total 70 passing backend tests).
+  - Frontend Usage & Billing dashboard in `frontend/app/(dashboard)/billing/page.tsx` with real-time progress bars, plan comparison grid, 1-click sandbox upgrade, and invoice table.
+  - Frontend Admin Telemetry & Health console in `frontend/app/(dashboard)/admin/page.tsx` with service health probes, subscription breakdown, and expandable audit log viewer.
+

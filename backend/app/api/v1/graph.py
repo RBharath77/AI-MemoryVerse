@@ -301,4 +301,3 @@ async def extract_graph(
             ],
         ),
     )
-

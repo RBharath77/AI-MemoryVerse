@@ -163,4 +163,3 @@ class OpenAITTSProvider(BaseTTSProvider):
             content_type="audio/mpeg",
             duration_estimate=max(1.0, len(text.split()) / 2.5),
         )
-

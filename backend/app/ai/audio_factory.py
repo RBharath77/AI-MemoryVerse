@@ -31,4 +31,3 @@ def get_tts_provider() -> BaseTTSProvider:
         return OpenAITTSProvider(api_key=settings.LLM_API_KEY)
 
     return MockTTSProvider()
-

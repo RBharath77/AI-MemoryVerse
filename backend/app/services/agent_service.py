@@ -123,8 +123,7 @@ class AgentService:
         if task.steps_taken >= task.steps_limit:
             task.status = TaskStatus.COMPLETED
             task.result_summary = (
-                f"Completed {task.steps_taken} autonomous steps. "
-                "Step limit reached successfully."
+                f"Completed {task.steps_taken} autonomous steps. Step limit reached successfully."
             )
             await db.commit()
             await db.refresh(task)
@@ -298,8 +297,7 @@ class AgentService:
                         "description": entity.description,
                         "mention_count": entity.mention_count,
                         "connected_edges": (
-                            len(entity.outgoing_relationships)
-                            + len(entity.incoming_relationships)
+                            len(entity.outgoing_relationships) + len(entity.incoming_relationships)
                         ),
                     }
                 else:

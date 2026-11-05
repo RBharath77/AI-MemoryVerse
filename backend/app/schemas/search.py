@@ -26,4 +26,3 @@ class HybridSearchResponse(BaseModel):
     query: str
     results: list[SearchResultResponseItem]
     total_found: int
-

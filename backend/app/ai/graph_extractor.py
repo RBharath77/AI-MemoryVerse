@@ -234,9 +234,7 @@ class GraphExtractor:
         tech_entities = [
             e for e in entities_dict.values() if e.entity_type == EntityType.TECHNOLOGY
         ]
-        proj_entities = [
-            e for e in entities_dict.values() if e.entity_type == EntityType.PROJECT
-        ]
+        proj_entities = [e for e in entities_dict.values() if e.entity_type == EntityType.PROJECT]
         if proj_entities and tech_entities and not relationships:
             p = proj_entities[0]
             for t in tech_entities[:4]:
