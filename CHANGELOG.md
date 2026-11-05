@@ -38,3 +38,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Accessible authentication pages for Sign In and Sign Up.
   - Authenticated dashboard layout with category navigation, mobile drawer, and dynamic workspace switcher.
   - Verified static compilation of all routes via `npm run build`.
+
+- **Phase 3 — Intelligent Memory Engine**:
+  - Pluggable AI Provider Abstraction layer in `app/ai/base.py` (`BaseLLMProvider`, `BaseEmbeddingProvider`, `ExtractedFact`, `LLMResponse`).
+  - Provider implementations for OpenAI (`app/ai/openai_provider.py`), Google Gemini (`app/ai/gemini_provider.py`), and Deterministic Mock (`app/ai/mock_provider.py`).
+  - Dynamic AI provider factory (`app/ai/factory.py`) with automatic fallback to mock engine when API keys are not present.
+  - Automatic Fact Extraction pipeline (`app/ai/memory_extractor.py`) with sensitive PII and credential guardrails.
+  - Conflict & Contradiction Detection engine (`app/ai/conflict_detector.py`) with lexical antonym pairing, mode inversion, and relocation detection.
+  - Human-in-the-Loop Memory Review Inbox router (`app/api/v1/memory_reviews.py`) with approval, rejection, and inline fact correction workflows.
+  - Full revision version history and one-click version restoration (`/api/v1/memories/{id}/restore`).
+  - Memory Consolidation endpoint (`/api/v1/memories/consolidate`) with automatic supersession and relationship links.
+  - Temporal validity management with `valid_from`, `valid_until`, and chronological timeline (`/api/v1/memories/timeline`).
+  - Tenancy-isolated Graph links (`MemoryLink`) and user feedback tracking (`MemoryFeedback`).
+  - Workspace analytics endpoint (`/api/v1/memories/analytics`) and bulk import/export (JSON and CSV).
+  - Alembic database migration `0002_memories` for all Phase 3 tables.
+  - 8 new comprehensive automated tests in `tests/test_memory_engine.py` (total 30 passing backend tests).
+  - Frontend Review Inbox updated with real review action handlers, conflict warnings, and correction modal.

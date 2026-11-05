@@ -106,8 +106,7 @@ class AuthService:
             refresh_token_hash="pending",
             user_agent="Registration",
             ip_address="127.0.0.1",
-            expires_at=datetime.now(UTC)
-            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
             is_revoked=False,
         )
         db.add(session)
@@ -177,8 +176,7 @@ class AuthService:
             refresh_token_hash="pending",
             user_agent=user_agent[:512],
             ip_address=ip_address[:64],
-            expires_at=datetime.now(UTC)
-            + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
+            expires_at=datetime.now(UTC) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS),
             is_revoked=False,
         )
         db.add(session)
@@ -206,9 +204,7 @@ class AuthService:
         return user, tokens, default_workspace_id
 
     @staticmethod
-    async def refresh_session(
-        db: AsyncSession, refresh_token: str
-    ) -> tuple[TokenResponse, str]:
+    async def refresh_session(db: AsyncSession, refresh_token: str) -> tuple[TokenResponse, str]:
         payload = decode_token(refresh_token)
         if not payload or payload.get("type") != "refresh":
             raise HTTPException(
@@ -263,9 +259,7 @@ class AuthService:
 
         # Generate new access token
         user_query = (
-            select(User)
-            .options(selectinload(User.workspace_memberships))
-            .where(User.id == user_id)
+            select(User).options(selectinload(User.workspace_memberships)).where(User.id == user_id)
         )
         user_res = await db.execute(user_query)
         user = user_res.scalar_one_or_none()
@@ -276,9 +270,7 @@ class AuthService:
             )
 
         default_workspace_id = (
-            user.workspace_memberships[0].workspace_id
-            if user.workspace_memberships
-            else None
+            user.workspace_memberships[0].workspace_id if user.workspace_memberships else None
         )
 
         claims = {

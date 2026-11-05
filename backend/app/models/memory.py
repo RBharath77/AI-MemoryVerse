@@ -112,11 +112,19 @@ class Memory(Base, TimestampMixin):
         back_populates="memory",
         cascade="all, delete-orphan",
         order_by="desc(MemoryVersion.version_number)",
+        lazy="selectin",
     )
     reviews: Mapped[list["MemoryReview"]] = relationship(
         "MemoryReview",
         back_populates="memory",
         cascade="all, delete-orphan",
+        lazy="selectin",
+    )
+    feedbacks: Mapped[list["MemoryFeedback"]] = relationship(
+        "MemoryFeedback",
+        back_populates="memory",
+        cascade="all, delete-orphan",
+        lazy="selectin",
     )
 
 
@@ -155,6 +163,12 @@ class MemoryReview(Base, TimestampMixin):
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
     )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     memory_id: Mapped[str] = mapped_column(
         String(36),
         ForeignKey("memories.id", ondelete="CASCADE"),
@@ -176,7 +190,7 @@ class MemoryReview(Base, TimestampMixin):
     review_notes: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    memory: Mapped["Memory"] = relationship("Memory", back_populates="reviews")
+    memory: Mapped["Memory"] = relationship("Memory", back_populates="reviews", lazy="selectin")
 
 
 class MemoryLink(Base, TimestampMixin):
@@ -186,6 +200,12 @@ class MemoryLink(Base, TimestampMixin):
         String(36),
         primary_key=True,
         default=lambda: str(uuid.uuid4()),
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
     )
     source_memory_id: Mapped[str] = mapped_column(
         String(36),
@@ -204,3 +224,35 @@ class MemoryLink(Base, TimestampMixin):
         nullable=False,
     )
     confidence: Mapped[float] = mapped_column(Float, default=1.0, nullable=False)
+
+
+class MemoryFeedback(Base, TimestampMixin):
+    __tablename__ = "memory_feedbacks"
+
+    id: Mapped[str] = mapped_column(
+        String(36),
+        primary_key=True,
+        default=lambda: str(uuid.uuid4()),
+    )
+    workspace_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("workspaces.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    memory_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("memories.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    user_id: Mapped[str] = mapped_column(
+        String(36),
+        ForeignKey("users.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
+    rating: Mapped[int] = mapped_column(Integer, nullable=False)  # 1 for positive, -1 for negative
+    feedback_text: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+    memory: Mapped["Memory"] = relationship("Memory", back_populates="feedbacks")

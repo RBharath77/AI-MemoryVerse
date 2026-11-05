@@ -18,4 +18,3 @@ async def test_readiness_check(client: AsyncClient):
     data = response.json()
     assert data["status"] == "ready"
     assert data["database"] == "connected"
-

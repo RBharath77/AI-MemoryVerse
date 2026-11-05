@@ -14,11 +14,13 @@ is_sqlite = settings.DATABASE_URL.startswith("sqlite")
 
 engine_kwargs = {"echo": False}
 if not is_sqlite:
-    engine_kwargs.update({
-        "pool_size": settings.DATABASE_POOL_SIZE,
-        "max_overflow": settings.DATABASE_MAX_OVERFLOW,
-        "pool_pre_ping": True,
-    })
+    engine_kwargs.update(
+        {
+            "pool_size": settings.DATABASE_POOL_SIZE,
+            "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+            "pool_pre_ping": True,
+        }
+    )
 
 async_engine = create_async_engine(settings.DATABASE_URL, **engine_kwargs)
 
@@ -37,6 +39,7 @@ class Base(DeclarativeBase):
 
 class TimestampMixin:
     """Mixin for created_at and updated_at timestamps in UTC."""
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         default=lambda: datetime.now(UTC),

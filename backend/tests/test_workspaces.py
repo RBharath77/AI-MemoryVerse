@@ -81,4 +81,3 @@ async def test_workspace_member_addition(client: AsyncClient, auth_headers: dict
     assert res.json()["success"] is True
     assert res.json()["data"]["user_id"] == member_user_id
     assert res.json()["data"]["role"] == "member"
-

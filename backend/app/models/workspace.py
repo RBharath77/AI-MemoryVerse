@@ -93,9 +93,7 @@ class WorkspaceMember(Base, TimestampMixin):
     )
 
     # Constraints
-    __table_args__ = (
-        UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),
-    )
+    __table_args__ = (UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),)
 
     # Relationships
     workspace: Mapped["Workspace"] = relationship("Workspace", back_populates="members")

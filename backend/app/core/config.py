@@ -1,4 +1,3 @@
-
 from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -26,7 +25,9 @@ class Settings(BaseSettings):
 
     # Database
     DATABASE_URL: str = "postgresql+asyncpg://postgres:postgrespassword@localhost:5432/memoryverse"
-    DATABASE_SYNC_URL: str = "postgresql+psycopg2://postgres:postgrespassword@localhost:5432/memoryverse"
+    DATABASE_SYNC_URL: str = (
+        "postgresql+psycopg2://postgres:postgrespassword@localhost:5432/memoryverse"
+    )
     DATABASE_POOL_SIZE: int = 10
     DATABASE_MAX_OVERFLOW: int = 20
 
