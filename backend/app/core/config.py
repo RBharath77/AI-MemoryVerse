@@ -39,10 +39,12 @@ class Settings(BaseSettings):
     # AI Configuration
     LLM_PROVIDER: str = "mock"
     LLM_API_KEY: str = ""
+    LLM_BASE_URL: str = ""
     LLM_MODEL: str = "gpt-4o-mini"
 
     EMBEDDING_PROVIDER: str = "mock"
     EMBEDDING_API_KEY: str = ""
+    EMBEDDING_BASE_URL: str = ""
     EMBEDDING_MODEL: str = "text-embedding-3-small"
     EMBEDDING_DIMENSIONS: int = 1536
 

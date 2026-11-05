@@ -31,10 +31,14 @@ class OpenAIProvider(BaseLLMProvider, BaseEmbeddingProvider):
         self.base_url = base_url.rstrip("/")
 
     def _headers(self) -> dict[str, str]:
-        return {
+        headers = {
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json",
         }
+        if "openrouter.ai" in self.base_url:
+            headers["HTTP-Referer"] = "https://memoryverse.ai"
+            headers["X-Title"] = "AI-MemoryVerse"
+        return headers
 
     async def generate_text(
         self,
