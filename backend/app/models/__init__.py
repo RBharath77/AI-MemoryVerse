@@ -1,4 +1,9 @@
 from app.core.database import Base
+from app.models.chat import (
+    ChatMessage,
+    Conversation,
+    MessageRole,
+)
 from app.models.document import (
     Document,
     DocumentChunk,
@@ -48,4 +53,7 @@ __all__ = [
     "Document",
     "DocumentChunk",
     "DocumentStatus",
+    "Conversation",
+    "ChatMessage",
+    "MessageRole",
 ]

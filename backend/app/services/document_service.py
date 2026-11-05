@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.chunker import DocumentChunker
 from app.ai.document_parser import DocumentParser
+from app.ai.factory import get_embedding_provider
 from app.core.storage import get_storage_provider
 from app.models.document import Document, DocumentChunk, DocumentStatus
 
@@ -122,7 +123,15 @@ class DocumentService:
                 await db.delete(ec)
             await db.flush()
 
-            for chunk_data in chunks:
+            embedder = get_embedding_provider()
+            chunk_texts = [c.content for c in chunks]
+            try:
+                chunk_embeddings = await embedder.get_embeddings(chunk_texts)
+            except Exception as e:
+                logger.warning(f"Failed to generate embeddings for chunks: {e}")
+                chunk_embeddings = [None] * len(chunks)
+
+            for chunk_data, emb in zip(chunks, chunk_embeddings):
                 chunk_obj = DocumentChunk(
                     document_id=doc.id,
                     workspace_id=doc.workspace_id,
@@ -133,6 +142,7 @@ class DocumentService:
                     end_char=chunk_data.end_char,
                     section_title=chunk_data.section_title,
                     extra_metadata=chunk_data.metadata,
+                    embedding=emb,
                 )
                 db.add(chunk_obj)
 

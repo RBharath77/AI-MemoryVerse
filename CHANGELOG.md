@@ -65,3 +65,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - REST endpoints in `app/api/v1/documents.py` for `/upload`, `/retry`, `/chunks`, `/download`, and CRUD operations.
   - 8 new comprehensive automated tests in `tests/test_document_intelligence.py` (total 38 passing backend tests).
   - Frontend Document Library page connected to live APIs with multipart upload, status badges, chunk inspection modal, retry, and deletion.
+
+- **Phase 5 — Full AI and RAG Engine**:
+  - pgvector HNSW database integration with `VectorType` dual-dialect fallback for fast in-memory SQLite unit testing.
+  - Vector embedding generation and automated embedding attachment to memories and document chunks.
+  - Hybrid Search Engine in `app/ai/retrieval.py` fusing lexical keyword search and dense vector similarity using Reciprocal Rank Fusion (RRF).
+  - Multi-signal Reranker in `app/ai/reranker.py` boosting pinned memories, importance weights, and exact keyword alignments.
+  - Budget-aware Context Assembler in `app/ai/context_assembler.py` formatting prompts with inline source citation markers (`[1]`, `[2]`).
+  - Conversation and Chat Message models (`Conversation`, `ChatMessage`) in `app/models/chat.py`.
+  - Alembic database migration `0004_rag_chat` adding conversations, chat_messages, and vector embedding columns.
+  - Chat service with session persistence, automatic conversation titling, Server-Sent Events (SSE) streaming, and response feedback ratings.
+  - REST endpoints in `app/api/v1/search.py` and `app/api/v1/chat.py`.
+  - 5 new comprehensive automated tests in `tests/test_rag_and_chat.py` (total 43 passing backend tests).
+  - Frontend Chat page connected to live APIs with conversation sidebar, grounded answer rendering, citation popovers, and feedback buttons.

@@ -10,6 +10,7 @@ from sqlalchemy import String, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.conflict_detector import ConflictDetector
+from app.ai.factory import get_embedding_provider
 from app.ai.memory_extractor import MemoryExtractor
 from app.models.memory import (
     Memory,
@@ -81,6 +82,13 @@ class MemoryService:
             meta["conflicting_memory_id"] = conflict_result.conflicting_memory_id
             meta["conflict_explanation"] = conflict_result.explanation
 
+        embedder = get_embedding_provider()
+        try:
+            emb = await embedder.get_embedding(data.content)
+        except Exception as e:
+            logger.warning(f"Failed to generate embedding for memory: {e}")
+            emb = None
+
         memory = Memory(
             workspace_id=workspace_id,
             user_id=user_id,
@@ -96,6 +104,7 @@ class MemoryService:
             source_id=data.source_id,
             tags=data.tags or [],
             extra_metadata=meta,
+            embedding=emb,
         )
         db.add(memory)
         await db.flush()
@@ -134,6 +143,7 @@ class MemoryService:
         data: MemoryExtractionRequest,
     ) -> MemoryExtractionResponse:
         extractor = MemoryExtractor()
+        embedder = get_embedding_provider()
         facts = await extractor.extract_facts(data.text)
 
         # Fetch active memories for conflict checking
@@ -186,6 +196,11 @@ class MemoryService:
                 meta["conflicting_memory_id"] = conflict.conflicting_memory_id
                 meta["conflict_explanation"] = conflict.explanation
 
+            try:
+                emb = await embedder.get_embedding(fact.content)
+            except Exception:
+                emb = None
+
             mem = Memory(
                 workspace_id=workspace_id,
                 user_id=user_id,
@@ -198,6 +213,7 @@ class MemoryService:
                 source_id=data.source_id,
                 tags=fact.tags or [],
                 extra_metadata=meta,
+                embedding=emb,
             )
             db.add(mem)
             await db.flush()

@@ -1,6 +1,7 @@
 import enum
 import uuid
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     ForeignKey,
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, TimestampMixin
 
 JSONType = JSON().with_variant(JSONB, "postgresql")
+VectorType = Vector(1536).with_variant(JSON, "sqlite")
 
 
 class DocumentStatus(enum.StrEnum):
@@ -114,6 +116,10 @@ class DocumentChunk(Base, TimestampMixin):
         JSONType,
         default=dict,
         nullable=False,
+    )
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType,
+        nullable=True,
     )
 
     document: Mapped["Document"] = relationship("Document", back_populates="chunks")

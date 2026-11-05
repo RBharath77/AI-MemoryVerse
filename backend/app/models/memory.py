@@ -2,6 +2,7 @@ import enum
 import uuid
 from datetime import UTC, datetime
 
+from pgvector.sqlalchemy import Vector
 from sqlalchemy import (
     JSON,
     Boolean,
@@ -21,6 +22,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.database import Base, TimestampMixin
 
 JSONType = JSON().with_variant(JSONB, "postgresql")
+VectorType = Vector(1536).with_variant(JSON, "sqlite")
 
 
 class MemoryCategory(enum.StrEnum):
@@ -105,6 +107,10 @@ class Memory(Base, TimestampMixin):
         JSONType,
         default=dict,
         nullable=False,
+    )
+    embedding: Mapped[list[float] | None] = mapped_column(
+        VectorType,
+        nullable=True,
     )
 
     versions: Mapped[list["MemoryVersion"]] = relationship(

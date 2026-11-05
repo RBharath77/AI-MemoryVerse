@@ -67,3 +67,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("document_chunks")
     op.drop_table("documents")
+
