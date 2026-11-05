@@ -3,8 +3,8 @@
 ## Status Overview
 - **Project Name:** AI-MemoryVerse
 - **Current Version:** 1.0.0-dev
-- **Current Phase:** Phase 7 (Completed) & Ready for Phase 8
-- **Overall Completion:** 82% (Phases 0-7 Completed: Repository Foundation, Full-Stack Auth & Workspaces, Live UI Views, Intelligent Memory Engine, Document Intelligence Pipeline, Full AI & RAG Engine, Advanced Knowledge Graph, and Personal AI Features with 54/54 passing backend tests)
+- **Current Phase:** Phase 8 (Completed) & Ready for Phase 9
+- **Overall Completion:** 89% (Phases 0-8 Completed: Repository Foundation, Full-Stack Auth & Workspaces, Live UI Views, Intelligent Memory Engine, Document Intelligence Pipeline, Full AI & RAG Engine, Advanced Knowledge Graph, Personal AI Features, Controlled Autonomous Agents & Integrations Hub with 61/61 passing backend tests and 19/19 prerendered frontend routes)
 - **Target Launch Platform:** Render (Web Services + Worker + PostgreSQL pgvector + Key Value/Redis)
 
 ---
@@ -21,7 +21,7 @@
 | **Phase 5** | Full AI and RAG Engine | **Completed** | pgvector HNSW integration, multi-tier hybrid search combining lexical keyword matching and dense vector cosine similarity with Reciprocal Rank Fusion (RRF), multi-signal reranker, budget-aware context assembly with inline citation mapping (`[1]`, `[2]`), persistent conversation sessions & chat messages, SSE streaming response endpoint, message feedback, and 43/43 passing pytest suite. |
 | **Phase 6** | Advanced Memory & Knowledge Graph | **Completed** | Relational knowledge graph models (`GraphEntity`, `GraphRelationship`, `EntityType`), rule-based & LLM extraction pipeline (`GraphExtractor`), Alembic migration `0005_knowledge_graph`, REST APIs (`/api/v1/graph/*`), interactive SVG/Canvas visual explorer (`/graph`) with pan/zoom/filter, and 48/48 passing pytest suite. |
 | **Phase 7** | Personal AI Features | **Completed** | Speech-to-Text & Text-to-Speech audio provider adapters (`OpenAISTTProvider`, `OpenAITTSProvider`, `MockSTTProvider`, `MockTTSProvider`), voice chat endpoint (`/api/v1/voice/chat`), multi-document research synthesis & daily/weekly digest generator (`/api/v1/research/generate`), proactive smart knowledge insights scanner (`/api/v1/research/insights`), Alembic migration `0006_research_and_insights`, frontend pages for `/voice`, `/research`, and `/insights`, and 54/54 passing pytest suite. |
-| **Phase 8** | Controlled Agents & Integrations | Pending | Tool registry & permission sandboxing scheduled. |
+| **Phase 8** | Controlled Agents & Integrations | **Completed** | Autonomous agent executor (`AgentTask`, `AgentAction`), risk classification (`LOW`, `MEDIUM`, `HIGH`), Human-in-the-Loop approval checkpoints for consequential actions, SSRF defense validator (`validate_url_ssrf`), HTML cleaner webpage importer, SHA-256 hashed API token management (`/api/v1/tokens`), Alembic migration `0007_agents_and_integrations`, frontend views for `/automation` & `/integrations`, and 61/61 passing backend tests. |
 | **Phase 9** | SaaS Product System | Pending | Quotas, plans, and sandbox billing scheduled. |
 | **Phase 10** | Quality and Security | Pending | Automated security validation & AI evaluation suite scheduled. |
 | **Phase 11** | Production & Render Deployment | Pending | Render production rollout & smoke testing scheduled. |
@@ -29,7 +29,8 @@
 ---
 
 ## Test & Build Verification Summary
-- **Backend Pytest Suite:** 54 passed in 7.57s (100% pass rate)
+- **Backend Pytest Suite:** 61 passed in 10.49s (100% pass rate)
+  - `tests/test_agents_and_integrations.py` (7 tests passed: SSRF defense guardrails against localhost/private IPs/AWS metadata, HTML cleaner webpage extractor, autonomous agent multi-step task execution, human-in-the-loop approval checkpoint, human-in-the-loop rejection checkpoint, SHA-256 API token management lifecycle, multi-tenant agent & token isolation)
   - `tests/test_auth.py` (12 tests passed)
   - `tests/test_health.py` (2 tests passed)
   - `tests/test_memories.py` (4 tests passed)
@@ -37,7 +38,7 @@
   - `tests/test_document_intelligence.py` (8 tests passed)
   - `tests/test_rag_and_chat.py` (5 tests passed)
   - `tests/test_knowledge_graph.py` (5 tests passed)
-  - `tests/test_personal_ai.py` (6 tests passed: speech-to-text transcription, text-to-speech synthesis, voice chat RAG query with base64 audio response, research report generation lifecycle, daily & weekly digests, proactive smart knowledge insights lifecycle with dismissal, and multi-tenant report/insight isolation)
+  - `tests/test_personal_ai.py` (6 tests passed)
   - `tests/test_workspaces.py` (4 tests passed)
 - **Backend Linting:** `ruff check app/ tests/` (All checks passed)
-- **Frontend Build:** `npm run build` (Next.js 14.2.5 compiled successfully, 17/17 routes prerendered)
+- **Frontend Build:** `npm run build` (Next.js 14.2.5 compiled successfully, 19/19 routes prerendered)

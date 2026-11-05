@@ -1,4 +1,11 @@
 from app.core.database import Base
+from app.models.agent import (
+    ActionApprovalStatus,
+    AgentAction,
+    AgentTask,
+    APIToken,
+    TaskStatus,
+)
 from app.models.chat import (
     ChatMessage,
     Conversation,
@@ -76,4 +83,9 @@ __all__ = [
     "ReportType",
     "ReportStatus",
     "InsightType",
+    "AgentTask",
+    "AgentAction",
+    "APIToken",
+    "TaskStatus",
+    "ActionApprovalStatus",
 ]

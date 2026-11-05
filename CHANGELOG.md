@@ -98,5 +98,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - REST endpoints mounted in `app/api/v1/research.py` (`/reports`, `/generate`, `/insights`, `/insights/refresh`, `/insights/{id}/dismiss`).
   - 6 comprehensive automated tests in `tests/test_personal_ai.py` (total 54 passing backend tests).
   - Frontend Voice Assistant page in `frontend/app/(dashboard)/voice/page.tsx` with Web Audio MediaRecorder recording, pulsing waveform visualizer, and live audio playback.
+  - Frontend Research Lab page in `frontend/app/(dashboard)/research/page.tsx` with report generator, scope configuration, and markdown reader.
+  - Frontend Smart Insights page in `frontend/app/(dashboard)/insights/page.tsx` with diagnostic cards and 1-click remediation actions.
+
+- **Phase 8 — Controlled Agents & Integrations**:
+  - SSRF protection module in `app/core/ssrf.py` validating scheme, host, and resolving IP addresses against loopback (`127.0.0.0/8`), RFC 1918 private networks, AWS/cloud metadata (`169.254.169.254`), carrier-grade NAT, and IPv6 loopback.
+  - Webpage text extractor and HTML sanitizer in `app/services/url_service.py` stripping scripts, stylesheets, and formatting semantic text.
+  - Autonomous Tool Registry (`ToolRegistry`) in `app/ai/tools.py` with 7 pre-registered tools (`search_memories`, `search_documents`, `lookup_knowledge_graph`, `fetch_web_url`, `propose_memory`, `delete_memory`, `trigger_webhook`) and risk classification (`LOW`, `MEDIUM`, `HIGH`).
+  - Relational models for `AgentTask`, `AgentAction`, and `APIToken` in `app/models/agent.py` with Alembic database migration `0007_agents_and_integrations`.
+  - Autonomous Agent Service (`AgentService`) in `app/services/agent_service.py` managing multi-step task execution, step limits, latency measurement, and Human-in-the-Loop approval/rejection checkpoints for high-risk actions.
+  - Cryptographic API token service generating SHA-256 hashed tokens with customizable permission scopes and expiration policies.
+  - REST API endpoints for agent tasks (`/api/v1/agents/tasks`), action approvals (`/api/v1/agents/actions/{id}/approve`), web importer (`/api/v1/agents/import-url`), and tokens (`/api/v1/tokens`).
+  - 7 comprehensive automated tests in `tests/test_agents_and_integrations.py` (total 61 passing backend tests).
+  - Frontend Controlled Agents management page in `frontend/app/(dashboard)/automation/page.tsx` with urgent approval banners, task progress bars, action audit trail, tool registry drawer, and SSRF webpage importer modal.
+  - Frontend Developer API Keys & Integrations Hub in `frontend/app/(dashboard)/integrations/page.tsx` with token table, scope configurator, one-time plaintext key reveal modal, and cURL quickstart documentation.
+
   - Frontend Research Lab page in `frontend/app/(dashboard)/research/page.tsx` with markdown report reader, key findings, and action items.
   - Frontend Smart Insights page in `frontend/app/(dashboard)/insights/page.tsx` with proactive knowledge cards and 1-click remediation actions.

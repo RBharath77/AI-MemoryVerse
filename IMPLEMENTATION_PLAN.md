@@ -119,13 +119,14 @@ This implementation plan provides a structured, phased roadmap to build, test, a
 ---
 
 ## Phase 8: Controlled Agents and Integrations
-- [ ] Implement tool-calling registry with strict argument schemas and validation.
-- [ ] Enforce user approval checkpoints for destructive or consequential agent actions.
-- [ ] Implement Agent Task execution manager with audit logging and rate limiting.
-- [ ] Implement Webpage URL importer with SSRF protection and readable text extraction.
-- [ ] Implement Webhook endpoints and external API token management.
+- [x] Implement tool-calling registry with strict argument schemas and validation.
+- [x] Enforce user approval checkpoints for destructive or consequential agent actions.
+- [x] Implement Agent Task execution manager with audit logging and rate limiting.
+- [x] Implement Webpage URL importer with SSRF protection and readable text extraction.
+- [x] Implement Webhook endpoints and external API token management.
 
-*Acceptance Criteria:* Sandboxed, permission-controlled agent workflows with clear human-in-the-loop review.
+*Acceptance Criteria:* Sandboxed, permission-controlled agent workflows with clear human-in-the-loop review. Verified with 7/7 passing backend tests in `tests/test_agents_and_integrations.py` and Next.js frontend pages for `/automation` and `/integrations`.
+
 
 ---
 
