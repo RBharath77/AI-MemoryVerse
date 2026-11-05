@@ -85,6 +85,9 @@ storage/
 local_storage/
 backend/storage/
 *.log
+*.db
+*.sqlite
+*.sqlite3
 
 # Docker Local Overrides
 docker-compose.override.yml
