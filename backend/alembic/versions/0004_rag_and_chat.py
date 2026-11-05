@@ -82,3 +82,4 @@ def downgrade() -> None:
         op.drop_column("memories", "embedding")
     except Exception:
         pass
+

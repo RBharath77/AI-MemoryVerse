@@ -9,6 +9,11 @@ from app.models.document import (
     DocumentChunk,
     DocumentStatus,
 )
+from app.models.graph import (
+    EntityType,
+    GraphEntity,
+    GraphRelationship,
+)
 from app.models.memory import (
     Memory,
     MemoryCategory,
@@ -56,4 +61,7 @@ __all__ = [
     "Conversation",
     "ChatMessage",
     "MessageRole",
+    "GraphEntity",
+    "GraphRelationship",
+    "EntityType",
 ]

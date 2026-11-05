@@ -78,3 +78,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - REST endpoints in `app/api/v1/search.py` and `app/api/v1/chat.py`.
   - 5 new comprehensive automated tests in `tests/test_rag_and_chat.py` (total 43 passing backend tests).
   - Frontend Chat page connected to live APIs with conversation sidebar, grounded answer rendering, citation popovers, and feedback buttons.
+
+- **Phase 6 — Advanced Memory & Knowledge Graph**:
+  - Relational knowledge graph models (`GraphEntity`, `GraphRelationship`, `EntityType`) in `app/models/graph.py` with multi-tenant workspace isolation and selectin eager loading.
+  - Entity and Relationship extraction pipeline (`GraphExtractor`) in `app/ai/graph_extractor.py` supporting rule-based regex patterns and LLM JSON extraction.
+  - Graph service (`GraphService`) in `app/services/graph_service.py` with entity CRUD, edge creation, degree computation, neighborhood queries, and graph analytics.
+  - Alembic database migration `0005_knowledge_graph` adding `graph_entities` and `graph_relationships` with foreign key cascades and unique constraints.
+  - REST endpoints in `app/api/v1/graph.py` mounted at `/api/v1/graph` for `/entities`, `/relationships`, `/workspace`, `/neighborhood/{entity_id}`, `/analytics`, and `/extract`.
+  - 5 comprehensive automated tests in `tests/test_knowledge_graph.py` (total 48 passing backend tests).
+  - Interactive SVG/Canvas Knowledge Graph explorer page in `frontend/app/(dashboard)/graph/page.tsx` with pan, zoom, node drag, search filtering by entity type, selected entity details drawer, and create entity / connect modals.
