@@ -67,3 +67,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("graph_relationships")
     op.drop_table("graph_entities")
+

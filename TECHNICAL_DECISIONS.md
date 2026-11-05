@@ -47,3 +47,17 @@
 - **Decision:** Implement an S3-compatible storage adapter with presigned upload/download URLs (compatible with AWS S3, Cloudflare R2, MinIO, or local disk fallback for tests).
 - **Consequences:** Zero risk of data loss on container restarts; direct client uploads reduce load on API servers.
 
+---
+
+## ADR-008: Knowledge Graph Storage — Relational Edges over Graph Database (Neo4j)
+- **Context:** Storing and visualizing entity-relationship networks within the memory vault requires strong data isolation and atomic joins with existing memories and documents.
+- **Decision:** Model the knowledge graph using relational tables (`graph_entities` and `graph_relationships`) with strict `workspace_id` scoping and eager selectin loading in PostgreSQL.
+- **Consequences:** Avoids managing a separate Neo4j cluster; preserves ACID transactional consistency with memories and documents, while enabling fast ego-network neighborhood queries and degree analytics.
+
+---
+
+## ADR-009: Audio & Speech Processing — In-Band Audio Synthesis & Native Web Audio
+- **Context:** Voice interactions must deliver responsive conversational latency without forcing browser reliance on third-party speech engines.
+- **Decision:** Provide unified speech endpoints (`/api/v1/voice/transcribe`, `/api/v1/voice/synthesize`, `/api/v1/voice/chat`) with in-band base64 audio response delivery and standard HTML5/Web Audio playback.
+- **Consequences:** Reduces client round-trips to a single request; eliminates external audio hosting latency and provides deterministic WAV audio fallbacks for automated testing.
+

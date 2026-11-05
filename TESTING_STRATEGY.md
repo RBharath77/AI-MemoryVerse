@@ -42,3 +42,67 @@ AI-MemoryVerse employs an automated testing strategy ensuring every core layer i
 - **Answer Groundedness**: Verifies that every assertion made by the LLM is directly supported by retrieved context.
 - **Citation Precision**: Ensures every citation tag links to an actually retrieved and relevant chunk.
 
+---
+
+## 4. Automated Pytest Test Suite Matrix (54 Tests, 100% Passing)
+
+### 4.1 Authentication & Workspace Tenancy (`tests/test_auth.py`, `tests/test_workspaces.py`) — 16 Tests
+- User registration with unique email constraints & password complexity enforcement.
+- Argon2id password hashing and secure verification.
+- JWT access token generation and refresh token rotation with fingerprinting.
+- Multi-session management and explicit revocation (`/logout`).
+- Password reset token generation, expiration, and password update lifecycle.
+- Email verification token workflows.
+- User profile updates and soft/hard account deletion.
+- Workspace creation, role assignment (`owner`, `admin`, `member`), member addition, and cross-workspace data isolation.
+
+### 4.2 Core Memory Engine & Lifecycle (`tests/test_memories.py`, `tests/test_memory_engine.py`) — 12 Tests
+- Memory creation, retrieval, filtering by category (`episodic`, `semantic`, `project`, `preference`), and search.
+- Sensitive PII & credential guardrail (stripping passwords, API keys, and sensitive tokens).
+- Jaccard token overlap duplicate detection ($>0.75$ similarity).
+- Contradiction and antonym conflict detection (flags candidates into Review Inbox).
+- Review inbox human-in-the-loop workflows (approve, reject, correct).
+- Version history tracking and one-click historical restoration (`/restore`).
+- Memory consolidation with automatic supersession chaining.
+- Temporal validity (`valid_from`, `valid_until`) and chronological timeline filtering.
+- Graph links and thumbs up/down user feedback tracking.
+- Idempotent JSON/CSV memory bulk import and export.
+
+### 4.3 Document Intelligence Pipeline (`tests/test_document_intelligence.py`) — 8 Tests
+- Multi-format document parser (PDF, DOCX, TXT, MD, CSV, JSON, HTML).
+- Chunking strategies: fixed-size with token overlap, paragraph chunking, and markdown semantic header-aware chunking.
+- Document upload, size validation, and mime-type restriction checks.
+- Document status transitions (`pending` -> `processing` -> `completed` / `failed`).
+- Failure recovery and task retry mechanism (`/retry`).
+- Chunk inspector endpoint (`/chunks`) and secure download presigned URL generator.
+- Strict multi-tenant document isolation.
+
+### 4.4 Full RAG & Conversation Engine (`tests/test_rag_and_chat.py`) — 5 Tests
+- Vector embedding generation using `pgvector` HNSW index with dual-dialect SQLite testing fallback.
+- Hybrid Search fusing BM25 lexical keyword matching and dense vector cosine similarity with Reciprocal Rank Fusion (RRF, $k=60$).
+- Multi-signal reranking with pinned memory and importance weighting.
+- Budget-aware context assembler generating grounded inline source citations (`[1]`, `[2]`).
+- Persistent conversation session lifecycle and automatic conversational titling.
+- Server-Sent Events (SSE) token-by-token streaming response endpoint.
+- Cross-workspace conversation isolation.
+
+### 4.5 Knowledge Graph Engine (`tests/test_knowledge_graph.py`) — 5 Tests
+- Entity & relationship extraction pipeline (`GraphExtractor`) extracting technologies, projects, and people.
+- Entity CRUD lifecycle and mention count increments.
+- Relationship creation with validation against self-referential loops.
+- Ego-network neighborhood retrieval (`/api/v1/graph/neighborhood/{entity_id}`) with depth filtering.
+- Full workspace knowledge graph export and degree-based centrality analytics.
+- Multi-tenant entity and relationship isolation.
+
+### 4.6 Personal AI & Voice Features (`tests/test_personal_ai.py`) — 6 Tests
+- Speech-to-Text audio transcription with file size and format validation.
+- Text-to-Speech audio synthesis generating valid PCM WAV byte streams.
+- Full-duplex Voice Chat RAG query returning grounded assistant text and base64 audio response.
+- Multi-document research report generation (`topic_research`, `daily_digest`, `weekly_summary`).
+- Smart Knowledge Insights scanner (stale knowledge detection, contradiction alerts, knowledge gaps, and trending hubs).
+- Multi-tenant research report and insight isolation.
+
+### 4.7 System Health Probes (`tests/test_health.py`) — 2 Tests
+- Liveness check (`/health`) confirming process health and API responsiveness.
+- Readiness check (`/ready`) verifying database connectivity and connection pool readiness.
+

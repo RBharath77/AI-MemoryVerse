@@ -111,3 +111,4 @@ def upgrade() -> None:
 def downgrade() -> None:
     op.drop_table("knowledge_insights")
     op.drop_table("research_reports")
+

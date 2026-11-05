@@ -111,3 +111,19 @@ flowchart TD
 - Foreign keys and unique composite constraints enforce multi-tenant isolation at the database schema level.
 - Authorization middleware enforces Role-Based Access Control (RBAC): `Owner`, `Admin`, `Member`, `Viewer`.
 
+### 2.6 Knowledge Graph Subsystem (`app/models/graph.py`, `app/services/graph_service.py`)
+- **Entities & Relationships**: Relational graph representation with typed entities (`technology`, `project`, `person`, `organization`, `concept`, `location`, `event`) and directed relationship edges (`uses_technology`, `depends_on`, `collaborates_with`, etc.).
+- **Hybrid Extraction**: Combines deterministic regex pattern heuristics for tech stacks, projects, and names with LLM structured JSON triplet extraction.
+- **Ego-Network Retrieval**: Efficient query traversal supporting configurable neighborhood exploration depth and degree centrality calculation.
+- **Interactive Visualization**: Native SVG graph engine with force-directed circular layouts, zoom/pan controls, node dragging, and type-based filtering.
+
+### 2.7 Personal AI & Voice Intelligence (`app/ai/audio_providers.py`, `app/api/v1/voice.py`)
+- **Audio Provider Abstraction**: Pluggable `BaseSTTProvider` and `BaseTTSProvider` supporting Whisper STT and OpenAI TTS with offline deterministic PCM WAV mock fallbacks.
+- **Voice Chat Mode**: Real-time voice interaction querying the workspace RAG pipeline and streaming back both text and base64 audio data for immediate browser playback.
+- **Client Audio Engine**: Web Audio and MediaRecorder API integration with animated pulsing waveform indicators and recording timers.
+
+### 2.8 Research Lab & Proactive Knowledge Insights (`app/services/research_service.py`)
+- **Automated Research Synthesis**: Multi-document research generation across timeframe windows, producing Markdown executive summaries, key findings arrays, action item checklists, and source citation links.
+- **Daily & Weekly Digests**: Automated consolidation of recently recorded facts and project milestones.
+- **Smart Insights Scanner**: Proactive hygiene scanner flagging stale facts ($>30$ days unreviewed), contradiction/conflict review flags, central graph hubs, and undocumented project gaps with 1-click remediation actions.
+

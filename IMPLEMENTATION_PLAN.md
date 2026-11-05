@@ -96,23 +96,23 @@ This implementation plan provides a structured, phased roadmap to build, test, a
 ---
 
 ## Phase 6: Advanced Memory and Knowledge Graph
-- [ ] Implement Knowledge Graph models: `Entity`, `EntityRelation`, `EntityMention`.
-- [ ] Implement Named Entity Recognition & Relationship Extraction from conversations and documents.
-- [ ] Implement Entity Resolution and deduplication.
-- [ ] Implement Knowledge Graph exploration API (`/api/v1/graph`, `/entities`, `/relationships`).
-- [ ] Build interactive frontend Knowledge Graph visualization (using SVG / Canvas / force-directed rendering).
-- [ ] Connect Graph nodes to source memories and documents.
+- [x] Implement Knowledge Graph models: `GraphEntity`, `GraphRelationship`, `EntityType`.
+- [x] Implement Named Entity Recognition & Relationship Extraction from conversations and documents.
+- [x] Implement Entity Resolution and deduplication.
+- [x] Implement Knowledge Graph exploration API (`/api/v1/graph`, `/entities`, `/relationships`).
+- [x] Build interactive frontend Knowledge Graph visualization (using SVG / Canvas / force-directed rendering).
+- [x] Connect Graph nodes to source memories and documents.
 
 *Acceptance Criteria:* Real relational knowledge graph queryable and visually explorable with direct links to sources.
 
 ---
 
 ## Phase 7: Personal AI Features
-- [ ] Implement Speech-to-Text and Text-to-Speech provider adapters (Whisper, Web Speech API / ElevenLabs).
-- [ ] Implement Voice Chat Mode frontend interface.
-- [ ] Implement Daily and Weekly Knowledge Summary generation service.
-- [ ] Implement Project Research Assistant workflow (automated multi-document report generation).
-- [ ] Implement Smart Knowledge Insights (identifying knowledge gaps, stale facts, conflicting statements).
+- [x] Implement Speech-to-Text and Text-to-Speech provider adapters (Whisper, Web Speech API / ElevenLabs, Mock WAV).
+- [x] Implement Voice Chat Mode frontend interface.
+- [x] Implement Daily and Weekly Knowledge Summary generation service.
+- [x] Implement Project Research Assistant workflow (automated multi-document report generation).
+- [x] Implement Smart Knowledge Insights (identifying knowledge gaps, stale facts, conflicting statements).
 
 *Acceptance Criteria:* Functioning voice interactions, automated summaries, and multi-document research synthesis.
 

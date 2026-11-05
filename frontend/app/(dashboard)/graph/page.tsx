@@ -1146,3 +1146,4 @@ export default function KnowledgeGraphPage() {
     </div>
   );
 }
+
