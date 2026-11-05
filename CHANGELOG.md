@@ -87,3 +87,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - REST endpoints in `app/api/v1/graph.py` mounted at `/api/v1/graph` for `/entities`, `/relationships`, `/workspace`, `/neighborhood/{entity_id}`, `/analytics`, and `/extract`.
   - 5 comprehensive automated tests in `tests/test_knowledge_graph.py` (total 48 passing backend tests).
   - Interactive SVG/Canvas Knowledge Graph explorer page in `frontend/app/(dashboard)/graph/page.tsx` with pan, zoom, node drag, search filtering by entity type, selected entity details drawer, and create entity / connect modals.
+
+- **Phase 7 — Personal AI Features**:
+  - Speech-to-Text and Text-to-Speech audio provider abstraction and implementations in `app/ai/audio_providers.py` (`MockSTTProvider`, `MockTTSProvider`, `OpenAISTTProvider`, `OpenAITTSProvider`) and factory `app/ai/audio_factory.py`.
+  - Audio transcription endpoint (`/api/v1/voice/transcribe`) and real-time audio synthesis endpoint (`/api/v1/voice/synthesize`).
+  - Real-time voice chat endpoint (`/api/v1/voice/chat`) retrieving memory context and streaming back grounded answers with instant base64 audio data.
+  - Multi-document research synthesis engine in `app/services/research_service.py` supporting `topic_research`, `daily_digest`, `weekly_summary`, and `project_brief`.
+  - Automated Smart Knowledge Insights scanner identifying stale facts, unresolved contradiction flags, high-centrality graph hubs, and undocumented project gaps.
+  - Relational database models for `ResearchReport` and `KnowledgeInsight` in `app/models/research.py` with Alembic migration `0006_research_and_insights`.
+  - REST endpoints mounted in `app/api/v1/research.py` (`/reports`, `/generate`, `/insights`, `/insights/refresh`, `/insights/{id}/dismiss`).
+  - 6 comprehensive automated tests in `tests/test_personal_ai.py` (total 54 passing backend tests).
+  - Frontend Voice Assistant page in `frontend/app/(dashboard)/voice/page.tsx` with Web Audio MediaRecorder recording, pulsing waveform visualizer, and live audio playback.
+  - Frontend Research Lab page in `frontend/app/(dashboard)/research/page.tsx` with markdown report reader, key findings, and action items.
+  - Frontend Smart Insights page in `frontend/app/(dashboard)/insights/page.tsx` with proactive knowledge cards and 1-click remediation actions.

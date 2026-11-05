@@ -48,6 +48,8 @@ class Settings(BaseSettings):
 
     VISION_PROVIDER: str = "mock"
     SPEECH_PROVIDER: str = "mock"
+    OPENAI_WHISPER_MODEL: str = "whisper-1"
+    OPENAI_TTS_MODEL: str = "tts-1"
 
     # Storage
     STORAGE_PROVIDER: str = "local"

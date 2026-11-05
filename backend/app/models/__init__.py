@@ -23,6 +23,13 @@ from app.models.memory import (
     MemoryStatus,
     MemoryVersion,
 )
+from app.models.research import (
+    InsightType,
+    KnowledgeInsight,
+    ReportStatus,
+    ReportType,
+    ResearchReport,
+)
 from app.models.user import (
     PasswordResetToken,
     User,
@@ -64,4 +71,9 @@ __all__ = [
     "GraphEntity",
     "GraphRelationship",
     "EntityType",
+    "ResearchReport",
+    "KnowledgeInsight",
+    "ReportType",
+    "ReportStatus",
+    "InsightType",
 ]

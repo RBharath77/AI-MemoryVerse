@@ -80,3 +80,45 @@ class BaseEmbeddingProvider(ABC):
     async def get_embeddings(self, texts: list[str]) -> list[list[float]]:
         """Generate vector embeddings for a list of texts."""
         pass
+
+
+@dataclass
+class STTResponse:
+    text: str
+    language: str = "en"
+    duration: float = 0.0
+    confidence: float = 1.0
+
+
+@dataclass
+class TTSResponse:
+    audio_bytes: bytes
+    content_type: str = "audio/wav"
+    duration_estimate: float = 0.0
+
+
+class BaseSTTProvider(ABC):
+    """Abstract interface for Speech-to-Text providers."""
+
+    @abstractmethod
+    async def transcribe_audio(
+        self,
+        audio_data: bytes,
+        filename: str = "audio.wav",
+        content_type: str = "audio/wav",
+    ) -> STTResponse:
+        """Transcribe recorded speech into text."""
+        pass
+
+
+class BaseTTSProvider(ABC):
+    """Abstract interface for Text-to-Speech providers."""
+
+    @abstractmethod
+    async def synthesize_speech(
+        self,
+        text: str,
+        voice: str = "alloy",
+    ) -> TTSResponse:
+        """Synthesize spoken audio from text."""
+        pass
