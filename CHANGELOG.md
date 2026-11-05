@@ -126,3 +126,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Frontend Usage & Billing dashboard in `frontend/app/(dashboard)/billing/page.tsx` with real-time progress bars, plan comparison grid, 1-click sandbox upgrade, and invoice table.
   - Frontend Admin Telemetry & Health console in `frontend/app/(dashboard)/admin/page.tsx` with service health probes, subscription breakdown, and expandable audit log viewer.
 
+- **Phase 10 — Quality and Security**:
+  - Comprehensive End-to-End user journeys test suite (`tests/test_e2e_scenarios_and_security.py`) automating validation of all 12 core product workflows:
+    - User registration and workspace initialization.
+    - Memory persistence and ACID database verification.
+    - Conversation context and memory retrieval with inline citations.
+    - Multi-document upload, parsing, and hybrid search.
+    - Memory editing, revision history, and rollback.
+    - Contradiction detection and review inbox resolution.
+    - Knowledge graph traversal and ego-neighborhood queries.
+    - Strict multi-tenant zero-data-leakage IDOR protection.
+    - Cascading deletion of documents, chunks, and vector index references.
+    - Background worker health and liveness/readiness probes.
+  - OWASP Top 10 security defense validation:
+    - Parameterized SQL injection immunity across search queries, filters, and memory bodies.
+    - Strict SSRF protection blocklist matrix covering loopback, AWS metadata, and private RFC 1918 CIDRs.
+    - Sensitive credential and password suppression during automatic memory extraction.
+    - Broken Access Control defense rejecting unauthenticated requests with HTTP 401 across all protected endpoints.
+  - Full test suite verified at 84/84 passing backend tests (100% pass rate).
+
+

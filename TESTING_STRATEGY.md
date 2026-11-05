@@ -44,7 +44,7 @@ AI-MemoryVerse employs an automated testing strategy ensuring every core layer i
 
 ---
 
-## 4. Automated Pytest Test Suite Matrix (54 Tests, 100% Passing)
+## 4. Automated Pytest Test Suite Matrix (84 Tests, 100% Passing)
 
 ### 4.1 Authentication & Workspace Tenancy (`tests/test_auth.py`, `tests/test_workspaces.py`) — 16 Tests
 - User registration with unique email constraints & password complexity enforcement.
@@ -102,7 +102,44 @@ AI-MemoryVerse employs an automated testing strategy ensuring every core layer i
 - Smart Knowledge Insights scanner (stale knowledge detection, contradiction alerts, knowledge gaps, and trending hubs).
 - Multi-tenant research report and insight isolation.
 
-### 4.7 System Health Probes (`tests/test_health.py`) — 2 Tests
+### 4.7 Controlled Agents & Integrations (`tests/test_agents_and_integrations.py`) — 7 Tests
+- SSRF protection guardrails blocking loopback, AWS metadata, and private RFC 1918 addresses.
+- Sanitized HTML web crawler and text cleaner stripping scripts and styles.
+- Multi-step autonomous task planning and tool execution.
+- Human-in-the-loop approval checkpoint pausing execution on high-consequence tools.
+- Human-in-the-loop rejection checkpoint halting tasks and preventing unauthorized modifications.
+- SHA-256 hashed API token generation, prefix masking, and permission scope enforcement.
+- Cross-tenant agent task and token isolation.
+
+### 4.8 SaaS Billing & System Admin (`tests/test_billing_and_admin.py`) — 9 Tests
+- Plan catalog retrieval and quota limit definitions across all 4 tiers (Free, Personal, Pro, Team).
+- Real-time resource quota utilization tracking for memories, documents, storage, and AI queries.
+- Subscription lifecycle and automated paid invoice generation.
+- Sandbox payment checkout session simulator.
+- 1-click self-serve plan upgrades and quota expansions.
+- Subscription cancellation scheduling at period end.
+- System telemetry and live health probes for PostgreSQL, Redis, and Celery workers.
+- Compliance and operational audit log stream.
+- Cross-tenant subscription and billing isolation.
+
+### 4.9 12 E2E User Journeys & OWASP Security Defenses (`tests/test_e2e_scenarios_and_security.py`) — 14 Tests
+- Scenario 1: User registration, private workspace creation, and memory lifecycle.
+- Scenario 2: Memory state persistence verification across application reloads.
+- Scenario 3: Cross-session conversation context with grounded memory retrieval.
+- Scenario 4 & 5: Multi-document upload, parsing, chunking, and grounded inline citations.
+- Scenario 6: Memory editing, immutable revision history, and one-click rollback.
+- Scenario 7: Contradiction and semantic conflict detection with review inbox triage.
+- Scenario 8: Knowledge graph entity extraction and relationship graph exploration.
+- Scenario 9: Multi-tenant zero-data-leakage IDOR defense on all read/write operations.
+- Scenario 10: Cascade deletion of documents, chunks, and vector index references.
+- Scenario 11 & 12: Background worker queue processing, health checks, and database readiness.
+- OWASP A03: SQL injection immunity against parameterized queries.
+- OWASP A10: Comprehensive SSRF target blocklist validation.
+- Sensitive credential leakage guardrail (passwords and API keys blocked from memory extraction).
+- OWASP A01: Broken Access Control defense rejecting unauthenticated requests with HTTP 401.
+
+### 4.10 System Health Probes (`tests/test_health.py`) — 2 Tests
 - Liveness check (`/health`) confirming process health and API responsiveness.
 - Readiness check (`/ready`) verifying database connectivity and connection pool readiness.
+
 
