@@ -106,6 +106,31 @@ class RateLimiter:
 
             queue.append(now)
 
-    def reset(self) -> None:
-        """Clear all in-memory tracking records (useful in tests)."""
+    async def areset(self, client_id: str | None = None) -> None:
+        """Asynchronously clear both in-memory tracking records and Redis keys."""
         self._records.clear()
+        r = get_rate_limit_redis()
+        if r is not None:
+            try:
+                pattern = f"rate_limit:{client_id}:*" if client_id else "rate_limit:*"
+                keys = await r.keys(pattern)
+                if keys:
+                    await r.delete(*keys)
+            except Exception as e:
+                logger.debug(f"Async Redis rate limiter reset failed: {e}")
+
+    def reset(self, client_id: str | None = None) -> None:
+        """Clear all in-memory tracking records and distributed Redis rate limit keys."""
+        self._records.clear()
+        if getattr(settings, "REDIS_URL", None):
+            try:
+                import redis
+
+                sync_r = redis.from_url(settings.REDIS_URL, socket_timeout=0.5)
+                pattern = f"rate_limit:{client_id}:*" if client_id else "rate_limit:*"
+                keys = sync_r.keys(pattern)
+                if keys:
+                    sync_r.delete(*keys)
+                sync_r.close()
+            except Exception as e:
+                logger.debug(f"Sync Redis rate limiter reset failed: {e}")

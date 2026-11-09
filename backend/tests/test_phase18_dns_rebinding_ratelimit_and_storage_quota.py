@@ -131,7 +131,12 @@ async def test_rate_limiter_burst_and_reset():
             self.headers = {}
 
     limiter = RateLimiter(times=3, seconds=5)
-    mock_request = DummyRequest("192.0.2.100")
+    limiter.reset()
+    if hasattr(limiter, "areset"):
+        await limiter.areset()
+
+    client_ip = f"192.0.2.{int(datetime.now().timestamp() * 1000) % 200 + 10}"
+    mock_request = DummyRequest(client_ip)
 
     old_setting = getattr(settings, "RATE_LIMIT_ENABLED", True)
     try:
@@ -149,6 +154,8 @@ async def test_rate_limiter_burst_and_reset():
 
         # Reset clears records
         limiter.reset()
+        if hasattr(limiter, "areset"):
+            await limiter.areset()
         await limiter(mock_request)  # Should succeed again without exception
     finally:
         settings.RATE_LIMIT_ENABLED = old_setting
