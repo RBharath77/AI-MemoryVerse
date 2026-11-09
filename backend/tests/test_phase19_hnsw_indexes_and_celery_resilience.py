@@ -132,7 +132,7 @@ async def test_migration_0010_structure_and_syntax():
     mig = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mig)
 
-    assert mig.revision == "0010_pgvector_hnsw_and_account_lockout"
+    assert mig.revision == "0010_hnsw_and_lockout"
     assert mig.down_revision == "0009_user_token_versioning"
     assert callable(mig.upgrade)
     assert callable(mig.downgrade)
