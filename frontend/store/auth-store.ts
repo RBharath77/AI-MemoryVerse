@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { api } from "@/lib/api";
 
 export interface User {
   id: string;
@@ -7,6 +8,7 @@ export interface User {
   is_active: boolean;
   is_verified: boolean;
   is_superuser: boolean;
+  is_mfa_enabled?: boolean;
   profile?: {
     bio: string;
     avatar_url: string;
@@ -25,7 +27,7 @@ interface AuthState {
   setActiveWorkspace: (workspaceId: string) => void;
   updateUser: (user: Partial<User>) => void;
   logout: () => void;
-  initialize: () => void;
+  initialize: () => Promise<void>;
 }
 
 export const useAuthStore = create<AuthState>((set) => ({
@@ -85,7 +87,7 @@ export const useAuthStore = create<AuthState>((set) => ({
     });
   },
 
-  initialize: () => {
+  initialize: async () => {
     if (typeof window !== "undefined") {
       const token = localStorage.getItem("access_token");
       const workspaceId = localStorage.getItem("active_workspace_id");
@@ -106,8 +108,18 @@ export const useAuthStore = create<AuthState>((set) => ({
           // ignore corrupted JSON
         }
       }
+
+      // If no valid session exists, remain cleanly unauthenticated
+      set({
+        user: null,
+        accessToken: null,
+        activeWorkspaceId: null,
+        isAuthenticated: false,
+        isLoading: false,
+      });
+      return;
     }
+
     set({ isLoading: false });
   },
 }));
-

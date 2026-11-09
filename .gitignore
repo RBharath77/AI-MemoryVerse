@@ -62,6 +62,7 @@ frontend/.next/
 frontend/out/
 out/
 frontend/build/
+*.tsbuildinfo
 
 # Testing & Observability
 cypress/videos/

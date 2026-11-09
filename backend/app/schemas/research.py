@@ -9,7 +9,7 @@ from app.models.research import ReportType
 class ReportGenerateRequest(BaseModel):
     topic: str = Field(..., min_length=2, max_length=200)
     report_type: ReportType = ReportType.TOPIC_RESEARCH
-    focus_areas: list[str] = Field(default_factory=list)
+    focus_areas: list[str] = Field(default_factory=list, max_length=20)
     days_back: int = Field(default=30, ge=1, le=365)
 
 
@@ -58,7 +58,7 @@ class InsightListResponse(BaseModel):
 class VoiceChatRequest(BaseModel):
     query: str = Field(..., min_length=1, max_length=2000)
     conversation_id: str | None = None
-    voice: str = "alloy"
+    voice: str = Field(default="alloy", pattern=r"^(alloy|echo|fable|onyx|nova|shimmer)$")
 
 
 class VoiceChatResponse(BaseModel):
@@ -68,3 +68,43 @@ class VoiceChatResponse(BaseModel):
     citations: list[dict[str, Any]] = Field(default_factory=list)
     audio_base64: str | None = None
     audio_mime_type: str = "audio/wav"
+
+
+class NarrativeAct(BaseModel):
+    act_number: int
+    act_title: str
+    timeframe: str
+    narrative: str
+    supporting_memory_ids: list[str] = Field(default_factory=list)
+    key_entities: list[str] = Field(default_factory=list)
+
+
+class NarrativeSynthesisRequest(BaseModel):
+    focus_topic: str = Field(
+        ...,
+        min_length=2,
+        max_length=255,
+        description="Core subject or thematic domain, e.g. 'Security Architecture' or 'Project Titan'",
+    )
+    lookback_days: int = Field(
+        default=90,
+        ge=1,
+        le=730,
+        description="Lookback window in days for sourcing chronological context",
+    )
+    include_forward_guidance: bool = Field(
+        default=True,
+        description="Whether to formulate strategic forward guidance and horizon predictions",
+    )
+
+
+class NarrativeSynthesisResponse(BaseModel):
+    workspace_id: str
+    focus_topic: str
+    executive_summary: str
+    coherence_score: float = Field(ge=0.0, le=1.0)
+    continuity_index: float = Field(ge=0.0, le=1.0)
+    acts: list[NarrativeAct] = Field(default_factory=list)
+    total_sources_synthesized: int
+    forward_guidance: list[str] = Field(default_factory=list)
+    synthesized_at: datetime

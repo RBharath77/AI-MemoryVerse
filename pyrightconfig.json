@@ -1,0 +1,15 @@
+{
+  "include": [
+    "mcp_server.py",
+    "backend"
+  ],
+  "extraPaths": [
+    "backend",
+    "backend/app",
+    "backend/tests"
+  ],
+  "venvPath": "backend",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "reportMissingImports": "none"
+}

@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_workspace
+from app.api.deps import get_current_active_user, get_current_workspace
 from app.core.database import get_db
 from app.models.graph import EntityType
-from app.models.workspace import Workspace
+from app.models.user import User
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.common import APIResponse, PaginatedResponse
 from app.schemas.graph import (
+    CounterfactualSimulationRequest,
+    CounterfactualSimulationResponse,
     EntityCreate,
     EntityResponse,
     EntityUpdate,
@@ -14,6 +18,10 @@ from app.schemas.graph import (
     GraphDataResponse,
     GraphExtractionRequest,
     GraphExtractionResponse,
+    GraphPathReasoningResponse,
+    PathFindingRequest,
+    RelationInferenceRequest,
+    RelationInferenceResponse,
     RelationshipCreate,
     RelationshipResponse,
 )
@@ -23,6 +31,7 @@ router = APIRouter(prefix="/graph", tags=["Knowledge Graph"])
 
 
 @router.get("", response_model=APIResponse[GraphDataResponse])
+@router.get("/workspace", response_model=APIResponse[GraphDataResponse])
 async def get_workspace_graph(
     limit: int = Query(default=250, ge=1, le=1000),
     current_workspace: Workspace = Depends(get_current_workspace),
@@ -46,6 +55,75 @@ async def get_graph_analytics(
         workspace_id=current_workspace.id,
     )
     return APIResponse(success=True, data=analytics)
+
+
+@router.post(
+    "/reasoning/find-paths",
+    response_model=APIResponse[GraphPathReasoningResponse],
+)
+async def find_graph_reasoning_paths(
+    data: PathFindingRequest,
+    current_workspace: Workspace = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+):
+    """Traverse knowledge graph relationships to find explanatory multi-hop reasoning chains between two entities."""
+    from app.ai.graph_reasoner import GraphReasoningEngine
+
+    result = await GraphReasoningEngine.find_reasoning_paths(
+        db=db,
+        workspace_id=current_workspace.id,
+        source_identifier=data.source_entity,
+        target_identifier=data.target_entity,
+        max_depth=data.max_depth,
+    )
+    return APIResponse(success=True, data=result)
+
+
+@router.post(
+    "/reasoning/infer-relations",
+    response_model=APIResponse[RelationInferenceResponse],
+)
+async def infer_graph_relationships(
+    data: RelationInferenceRequest,
+    current_workspace: Workspace = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+):
+    """Infer implicit transitive relationship hypotheses across multi-hop entity connections."""
+    from app.ai.graph_reasoner import GraphReasoningEngine
+
+    result = await GraphReasoningEngine.infer_transitive_relationships(
+        db=db,
+        workspace_id=current_workspace.id,
+        focus_entity_id=data.entity_id,
+        min_confidence=data.min_confidence,
+        limit=data.limit,
+    )
+    return APIResponse(success=True, data=result)
+
+
+@router.post(
+    "/simulate-counterfactual",
+    response_model=APIResponse[CounterfactualSimulationResponse],
+)
+async def simulate_graph_counterfactual(
+    data: CounterfactualSimulationRequest,
+    current_workspace: Workspace = Depends(get_current_workspace),
+    db: AsyncSession = Depends(get_db),
+):
+    """
+    Semantic Knowledge Graph Counterfactual & What-If Simulation.
+    Simulates proposed architectural changes, migrations, or deprecations,
+    traversing multi-hop dependency graphs to compute downstream ripple effects,
+    architectural trade-offs, and blast radius scores.
+    """
+    from app.ai.counterfactual_simulator import CounterfactualSimulator
+
+    result = await CounterfactualSimulator.simulate(
+        db=db,
+        workspace_id=current_workspace.id,
+        request=data,
+    )
+    return APIResponse(success=True, data=result)
 
 
 @router.get("/entities", response_model=APIResponse[PaginatedResponse[EntityResponse]])
@@ -188,9 +266,25 @@ async def update_entity(
 @router.delete("/entities/{entity_id}", response_model=APIResponse[dict])
 async def delete_entity(
     entity_id: str,
+    current_user: User = Depends(get_current_active_user),
     current_workspace: Workspace = Depends(get_current_workspace),
     db: AsyncSession = Depends(get_db),
 ):
+    is_admin_or_owner = current_user.is_superuser
+    if not is_admin_or_owner:
+        q = select(WorkspaceMember.role).where(
+            WorkspaceMember.workspace_id == current_workspace.id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        role = (await db.execute(q)).scalar_one_or_none()
+        is_admin_or_owner = role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+
+    if not is_admin_or_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete knowledge graph entities. Requires workspace Admin or Owner.",
+        )
+
     await GraphService.delete_entity(
         db=db,
         workspace_id=current_workspace.id,
@@ -238,9 +332,25 @@ async def create_relationship(
 @router.delete("/relationships/{relationship_id}", response_model=APIResponse[dict])
 async def delete_relationship(
     relationship_id: str,
+    current_user: User = Depends(get_current_active_user),
     current_workspace: Workspace = Depends(get_current_workspace),
     db: AsyncSession = Depends(get_db),
 ):
+    is_admin_or_owner = current_user.is_superuser
+    if not is_admin_or_owner:
+        q = select(WorkspaceMember.role).where(
+            WorkspaceMember.workspace_id == current_workspace.id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        role = (await db.execute(q)).scalar_one_or_none()
+        is_admin_or_owner = role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+
+    if not is_admin_or_owner:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Insufficient permissions to delete knowledge graph relationships. Requires workspace Admin or Owner.",
+        )
+
     await GraphService.delete_relationship(
         db=db,
         workspace_id=current_workspace.id,

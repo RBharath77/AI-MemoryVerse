@@ -37,11 +37,25 @@ def is_ip_allowed(ip_str: str) -> bool:
     """Validate whether an IP address belongs to public, routable internet space."""
     try:
         ip = ipaddress.ip_address(ip_str)
-        if ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast:
+
+        # Normalize IPv4-mapped IPv6 addresses (e.g. ::ffff:127.0.0.1 or ::ffff:169.254.169.254)
+        if isinstance(ip, ipaddress.IPv6Address) and ip.ipv4_mapped:
+            ip = ip.ipv4_mapped
+
+        if (
+            ip.is_private
+            or ip.is_loopback
+            or ip.is_link_local
+            or ip.is_reserved
+            or ip.is_multicast
+            or ip.is_unspecified
+        ):
             return False
+
         for net in BLOCKED_NETWORKS:
-            if ip in net:
+            if net.version == ip.version and ip in net:
                 return False
+
         return True
     except ValueError:
         return False
@@ -108,3 +122,24 @@ def validate_url_safe(url: str) -> str:
             )
 
     return url
+
+
+def validate_and_resolve_url_safe(url: str) -> tuple[str, list[str]]:
+    """Validate URL SSRF safety and return both normalized URL and validated IP list.
+
+    Protects against DNS rebinding attacks by ensuring all resolved target IPs
+    belong strictly to public, non-private routable IP spaces.
+    """
+    safe_url = validate_url_safe(url)
+    parsed = urllib.parse.urlparse(safe_url)
+    hostname = parsed.hostname or ""
+    port = parsed.port or (443 if parsed.scheme == "https" else 80)
+    addr_info = socket.getaddrinfo(hostname, port)
+    resolved_ips = [item[4][0] for item in addr_info]
+    for ip in resolved_ips:
+        if not is_ip_allowed(ip):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"SSRF Protection: Access to restricted network target '{ip}' is forbidden.",
+            )
+    return safe_url, resolved_ips

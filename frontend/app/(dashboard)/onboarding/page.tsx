@@ -14,6 +14,7 @@ import {
 } from "lucide-react";
 import { api } from "@/lib/api";
 import { useAuthStore } from "@/store/auth-store";
+import { Logo } from "@/components/ui/logo";
 
 export default function OnboardingPage() {
   const router = useRouter();
@@ -71,10 +72,8 @@ export default function OnboardingPage() {
         {/* Step indicator */}
         <div className="flex items-center justify-between pb-6 border-b border-navy-800">
           <div className="flex items-center space-x-2">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-cyan-500 to-blue-600 flex items-center justify-center">
-              <Brain className="w-4 h-4 text-white" />
-            </div>
-            <span className="font-bold text-sm text-white">AI-MemoryVerse Setup</span>
+            <Logo size="sm" />
+            <span className="text-xs font-semibold text-slate-400">Setup</span>
           </div>
           <span className="text-xs font-mono text-cyan-400">Step {step} of 4</span>
         </div>

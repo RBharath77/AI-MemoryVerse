@@ -1,5 +1,6 @@
 import time
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlalchemy import func, select
@@ -105,6 +106,40 @@ class AdminService:
         ]
 
     @staticmethod
+    async def export_audit_logs(
+        db: AsyncSession,
+        workspace_id: str | None = None,
+        from_date: datetime | None = None,
+        to_date: datetime | None = None,
+        action: str | None = None,
+        limit: int = 500,
+    ) -> list[AuditEventResponse]:
+        stmt = select(AuditEvent).order_by(AuditEvent.created_at.desc()).limit(limit)
+        if workspace_id:
+            stmt = stmt.where(AuditEvent.workspace_id == workspace_id)
+        if action:
+            stmt = stmt.where(AuditEvent.action == action)
+        if from_date:
+            stmt = stmt.where(AuditEvent.created_at >= from_date)
+        if to_date:
+            stmt = stmt.where(AuditEvent.created_at <= to_date)
+
+        results = (await db.execute(stmt)).scalars().all()
+        return [
+            AuditEventResponse(
+                id=evt.id,
+                workspace_id=evt.workspace_id,
+                user_id=evt.user_id,
+                action=evt.action,
+                ip_address=evt.ip_address,
+                user_agent=evt.user_agent,
+                details=evt.details or {},
+                created_at=evt.created_at,
+            )
+            for evt in results
+        ]
+
+    @staticmethod
     async def record_audit_event(
         db: AsyncSession,
         action: str,
@@ -114,7 +149,22 @@ class AdminService:
         user_agent: str | None = None,
         details: dict[str, Any] | None = None,
     ) -> AuditEvent:
-        evt = AuditEvent(
+        from app.core.audit import SecurityAuditLogger
+
+        evt = await SecurityAuditLogger.log_event(
+            db=db,
+            action=action,
+            workspace_id=workspace_id,
+            user_id=user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            details=details or {},
+        )
+        if evt:
+            return evt
+
+        # Fallback if logging encountered issue
+        fallback_evt = AuditEvent(
             id=str(uuid.uuid4()),
             workspace_id=workspace_id,
             user_id=user_id,
@@ -123,7 +173,62 @@ class AdminService:
             user_agent=user_agent,
             details=details or {},
         )
-        db.add(evt)
+        db.add(fallback_evt)
         await db.commit()
-        await db.refresh(evt)
-        return evt
+        await db.refresh(fallback_evt)
+        return fallback_evt
+
+    @staticmethod
+    async def verify_audit_hash_chain(
+        db: AsyncSession,
+        workspace_id: str | None = None,
+    ) -> dict[str, Any]:
+        from app.core.audit import SecurityAuditLogger
+
+        return await SecurityAuditLogger.verify_chain(db, workspace_id=workspace_id)
+
+    @staticmethod
+    async def compute_merkle_root(
+        db: AsyncSession,
+        workspace_id: str | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        action_filter: str | None = None,
+    ):
+        from app.core.merkle import MerkleAuditEngine
+
+        return await MerkleAuditEngine.compute_workspace_merkle_root(
+            db=db,
+            workspace_id=workspace_id,
+            start_date=start_date,
+            end_date=end_date,
+            action_filter=action_filter,
+        )
+
+    @staticmethod
+    async def generate_merkle_proof(
+        db: AsyncSession,
+        event_id: str,
+        workspace_id: str | None = None,
+    ):
+        from app.core.merkle import MerkleAuditEngine
+
+        return await MerkleAuditEngine.generate_event_inclusion_proof(
+            db=db,
+            event_id=event_id,
+            workspace_id=workspace_id,
+        )
+
+    @staticmethod
+    def verify_merkle_proof(
+        leaf_hash: str,
+        merkle_root: str,
+        audit_path: list[dict[str, str]],
+    ):
+        from app.core.merkle import MerkleAuditEngine
+
+        return MerkleAuditEngine.verify_inclusion_proof(
+            leaf_hash=leaf_hash,
+            merkle_root=merkle_root,
+            audit_path=audit_path,
+        )

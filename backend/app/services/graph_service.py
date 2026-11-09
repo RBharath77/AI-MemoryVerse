@@ -1,5 +1,5 @@
 import logging
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from fastapi import HTTPException, status
 from sqlalchemy import desc, func, or_, select
@@ -7,7 +7,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.ai.graph_extractor import GraphExtractor
+from app.models.document import Document
 from app.models.graph import EntityType, GraphEntity, GraphRelationship
+from app.models.memory import Memory
 from app.schemas.graph import (
     EntityCreate,
     EntityUpdate,
@@ -174,6 +176,37 @@ class GraphService:
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Source and target entities cannot be the same.",
             )
+
+        # Cross-tenant IDOR validation on source_memory_id and source_document_id
+        if data.source_memory_id:
+            mem_chk = (
+                await db.execute(
+                    select(Memory.id).where(
+                        Memory.id == data.source_memory_id,
+                        Memory.workspace_id == workspace_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not mem_chk:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Source memory not found in active workspace.",
+                )
+
+        if data.source_document_id:
+            doc_chk = (
+                await db.execute(
+                    select(Document.id).where(
+                        Document.id == data.source_document_id,
+                        Document.workspace_id == workspace_id,
+                    )
+                )
+            ).scalar_one_or_none()
+            if not doc_chk:
+                raise HTTPException(
+                    status_code=status.HTTP_404_NOT_FOUND,
+                    detail="Source document not found in active workspace.",
+                )
 
         # Check existing edge
         rel_type = data.relationship_type.strip().lower().replace(" ", "_")
@@ -416,30 +449,55 @@ class GraphService:
         db: AsyncSession,
         workspace_id: str,
     ) -> GraphAnalyticsResponse:
-        entities = list(
-            (await db.execute(select(GraphEntity).where(GraphEntity.workspace_id == workspace_id)))
-            .scalars()
-            .all()
-        )
-        relationships = list(
-            (
-                await db.execute(
-                    select(GraphRelationship).where(GraphRelationship.workspace_id == workspace_id)
+        # Database-level aggregate counts avoiding Python heap exhaustion
+        total_entities = (
+            await db.execute(
+                select(func.count(GraphEntity.id)).where(GraphEntity.workspace_id == workspace_id)
+            )
+        ).scalar() or 0
+
+        total_relationships = (
+            await db.execute(
+                select(func.count(GraphRelationship.id)).where(
+                    GraphRelationship.workspace_id == workspace_id
                 )
             )
-            .scalars()
-            .all()
+        ).scalar() or 0
+
+        # Aggregate entity types via SQL GROUP BY
+        type_rows = (
+            await db.execute(
+                select(GraphEntity.entity_type, func.count(GraphEntity.id))
+                .where(GraphEntity.workspace_id == workspace_id)
+                .group_by(GraphEntity.entity_type)
+            )
+        ).all()
+        type_counts = {r[0].value if hasattr(r[0], "value") else str(r[0]): r[1] for r in type_rows}
+
+        # Query top 100 most-mentioned entities to compute top central entities with bounded memory
+        top_entities_q = (
+            select(GraphEntity)
+            .where(GraphEntity.workspace_id == workspace_id)
+            .order_by(desc(GraphEntity.mention_count))
+            .limit(100)
         )
-
-        total_entities = len(entities)
-        total_relationships = len(relationships)
-
-        type_counts = Counter(e.entity_type.value for e in entities)
+        sample_entities = list((await db.execute(top_entities_q)).scalars().all())
+        sample_ids = {e.id for e in sample_entities}
 
         degrees: dict[str, int] = defaultdict(int)
-        for r in relationships:
-            degrees[r.source_entity_id] += 1
-            degrees[r.target_entity_id] += 1
+        if sample_ids:
+            rel_q = select(GraphRelationship).where(
+                GraphRelationship.workspace_id == workspace_id,
+                or_(
+                    GraphRelationship.source_entity_id.in_(sample_ids),
+                    GraphRelationship.target_entity_id.in_(sample_ids),
+                ),
+            )
+            for r in (await db.execute(rel_q)).scalars().all():
+                if r.source_entity_id in sample_ids:
+                    degrees[r.source_entity_id] += 1
+                if r.target_entity_id in sample_ids:
+                    degrees[r.target_entity_id] += 1
 
         top_central = sorted(
             [
@@ -450,9 +508,9 @@ class GraphService:
                     "degree": degrees[e.id],
                     "mention_count": e.mention_count,
                 }
-                for e in entities
+                for e in sample_entities
             ],
-            key=lambda x: x["degree"],
+            key=lambda x: (x["degree"], x["mention_count"]),
             reverse=True,
         )[:10]
 
@@ -461,7 +519,7 @@ class GraphService:
         return GraphAnalyticsResponse(
             total_entities=total_entities,
             total_relationships=total_relationships,
-            entity_type_breakdown=dict(type_counts),
+            entity_type_breakdown=type_counts,
             top_central_entities=top_central,
             average_degree=round(avg_degree, 2),
         )

@@ -74,9 +74,10 @@ export default function IntegrationsPage() {
 
   const fetchTokens = async () => {
     try {
-      const res = await api.get<{ items: APIToken[]; total: number }>("/tokens");
+      const res = await api.get<any>("/tokens");
       if (res.success && res.data) {
-        setTokens(res.data.items || []);
+        const list = Array.isArray(res.data) ? res.data : res.data.items || [];
+        setTokens(list);
       }
     } finally {
       setIsLoading(false);

@@ -21,6 +21,12 @@ class Settings(BaseSettings):
     CORS_ALLOWED_ORIGINS: list[str] | str = [
         "http://localhost:3000",
         "http://127.0.0.1:3000",
+        "https://localhost",
+        "https://127.0.0.1",
+        "http://localhost",
+        "http://127.0.0.1",
+        "https://memoryverse.local",
+        "http://memoryverse.local",
     ]
 
     # Database
@@ -65,6 +71,8 @@ class Settings(BaseSettings):
     # Authentication & Security
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+    ALLOW_DEMO_LOGIN: bool = False
+    RATE_LIMIT_ENABLED: bool = True
     COOKIE_SECURE: bool = False
     COOKIE_SAMESITE: str = "lax"
     COOKIE_DOMAIN: str = ""
@@ -73,6 +81,28 @@ class Settings(BaseSettings):
     PAYMENT_PROVIDER: str = "sandbox"
     PAYMENT_SECRET_KEY: str = ""
     PAYMENT_WEBHOOK_SECRET: str = ""
+
+    # Account Lockout & Security Bounds
+    ACCOUNT_LOCKOUT_ATTEMPTS: int = 5
+    ACCOUNT_LOCKOUT_MINUTES: int = 15
+
+    # Storage Quotas by Plan Tier (in bytes)
+    STORAGE_QUOTA_BYTES_BY_TIER: dict[str, int] = {
+        "free": 500 * 1024 * 1024,
+        "pro": 10 * 1024 * 1024 * 1024,
+        "enterprise": 100 * 1024 * 1024 * 1024,
+    }
+
+    @field_validator("SECRET_KEY")
+    @classmethod
+    def validate_secret_key(cls, v: str, info) -> str:
+        if info.data.get("APP_ENV") == "production" and (
+            not v or "insecure-dev-secret-key" in v or len(v) < 32
+        ):
+            raise ValueError(
+                "SECRET_KEY must be a secure, cryptographically random key of at least 32 characters in production."
+            )
+        return v
 
     @field_validator("CORS_ALLOWED_ORIGINS", mode="before")
     @classmethod

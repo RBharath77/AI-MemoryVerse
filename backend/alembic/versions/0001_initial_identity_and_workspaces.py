@@ -1,20 +1,23 @@
 """initial identity and workspaces
 
 Revision ID: 0001_initial
-Revises: 
+Revises:
 Create Date: 2026-11-04 21:00:00.000000
 
 """
-from typing import Sequence, Union
-from alembic import op
+
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "0001_initial"
-down_revision: Union[str, None] = None
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = None
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,11 +40,22 @@ def upgrade() -> None:
     op.create_table(
         "user_profiles",
         sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True),
+        sa.Column(
+            "user_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+            unique=True,
+        ),
         sa.Column("bio", sa.Text(), nullable=False, server_default=""),
         sa.Column("avatar_url", sa.String(length=512), nullable=False, server_default=""),
         sa.Column("ai_custom_instructions", sa.Text(), nullable=False, server_default=""),
-        sa.Column("preferences", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"),
+        sa.Column(
+            "preferences",
+            postgresql.JSONB(astext_type=sa.Text()),
+            nullable=False,
+            server_default="{}",
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
@@ -50,7 +64,12 @@ def upgrade() -> None:
     op.create_table(
         "user_sessions",
         sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("refresh_token_hash", sa.String(length=64), nullable=False),
         sa.Column("user_agent", sa.String(length=512), nullable=False, server_default=""),
         sa.Column("ip_address", sa.String(length=64), nullable=False, server_default=""),
@@ -60,7 +79,9 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index(op.f("ix_user_sessions_user_id"), "user_sessions", ["user_id"])
-    op.create_index(op.f("ix_user_sessions_refresh_token_hash"), "user_sessions", ["refresh_token_hash"])
+    op.create_index(
+        op.f("ix_user_sessions_refresh_token_hash"), "user_sessions", ["refresh_token_hash"]
+    )
 
     # 4. workspaces
     op.create_table(
@@ -69,9 +90,16 @@ def upgrade() -> None:
         sa.Column("name", sa.String(length=128), nullable=False),
         sa.Column("slug", sa.String(length=128), nullable=False),
         sa.Column("description", sa.Text(), nullable=False, server_default=""),
-        sa.Column("owner_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "owner_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("plan_tier", sa.String(length=32), nullable=False, server_default="free"),
-        sa.Column("settings", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"),
+        sa.Column(
+            "settings", postgresql.JSONB(astext_type=sa.Text()), nullable=False, server_default="{}"
+        ),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
@@ -82,35 +110,64 @@ def upgrade() -> None:
     op.create_table(
         "workspace_members",
         sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("workspace_id", sa.String(length=36), sa.ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False),
-        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "workspace_id",
+            sa.String(length=36),
+            sa.ForeignKey("workspaces.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
+        sa.Column(
+            "user_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("role", sa.String(length=32), nullable=False, server_default="member"),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
         sa.UniqueConstraint("workspace_id", "user_id", name="uq_workspace_member"),
     )
-    op.create_index(op.f("ix_workspace_members_workspace_id"), "workspace_members", ["workspace_id"])
+    op.create_index(
+        op.f("ix_workspace_members_workspace_id"), "workspace_members", ["workspace_id"]
+    )
     op.create_index(op.f("ix_workspace_members_user_id"), "workspace_members", ["user_id"])
 
     # 6. user_verification_tokens
     op.create_table(
         "user_verification_tokens",
         sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("token_hash", sa.String(length=64), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.false()),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
-    op.create_index(op.f("ix_user_verification_tokens_user_id"), "user_verification_tokens", ["user_id"])
-    op.create_index(op.f("ix_user_verification_tokens_token_hash"), "user_verification_tokens", ["token_hash"], unique=True)
+    op.create_index(
+        op.f("ix_user_verification_tokens_user_id"), "user_verification_tokens", ["user_id"]
+    )
+    op.create_index(
+        op.f("ix_user_verification_tokens_token_hash"),
+        "user_verification_tokens",
+        ["token_hash"],
+        unique=True,
+    )
 
     # 7. password_reset_tokens
     op.create_table(
         "password_reset_tokens",
         sa.Column("id", sa.String(length=36), primary_key=True),
-        sa.Column("user_id", sa.String(length=36), sa.ForeignKey("users.id", ondelete="CASCADE"), nullable=False),
+        sa.Column(
+            "user_id",
+            sa.String(length=36),
+            sa.ForeignKey("users.id", ondelete="CASCADE"),
+            nullable=False,
+        ),
         sa.Column("token_hash", sa.String(length=64), nullable=False),
         sa.Column("expires_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("is_used", sa.Boolean(), nullable=False, server_default=sa.false()),
@@ -118,7 +175,12 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
     op.create_index(op.f("ix_password_reset_tokens_user_id"), "password_reset_tokens", ["user_id"])
-    op.create_index(op.f("ix_password_reset_tokens_token_hash"), "password_reset_tokens", ["token_hash"], unique=True)
+    op.create_index(
+        op.f("ix_password_reset_tokens_token_hash"),
+        "password_reset_tokens",
+        ["token_hash"],
+        unique=True,
+    )
 
 
 def downgrade() -> None:
@@ -129,4 +191,3 @@ def downgrade() -> None:
     op.drop_table("user_sessions")
     op.drop_table("user_profiles")
     op.drop_table("users")
-

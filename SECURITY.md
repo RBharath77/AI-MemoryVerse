@@ -35,3 +35,39 @@ AI-MemoryVerse is built on zero-trust principles:
 - Presigned upload and download URLs have short expiration windows (max 15 minutes).
 - Sensitive fields in the database (such as integration OAuth tokens) are encrypted at rest using AES-GCM (via `cryptography.fernet`).
 
+### 3.4 Strict Password Complexity Policy
+Account creation and credential updates strictly enforce multi-factor character entropy:
+- **Minimum Length**: 8 characters (maximum 128 characters).
+- **Uppercase Character**: At least one uppercase English letter (`[A-Z]`).
+- **Lowercase Character**: At least one lowercase English letter (`[a-z]`).
+- **Numeric Digit**: At least one numeric digit (`[0-9]`).
+- **Special Symbol**: At least one punctuation or special symbol (`[!@#$%^&*()_+-=[]{};':"|,.<>/?`~]`).
+- **Dual Verification**: Enforced client-side via live interactive checklist UI and server-side via Pydantic v2 `@field_validator` in `RegisterRequest` and `ResetPasswordRequest`.
+
+### 3.5 Enterprise HTTPS Load Balancer & Edge Security Posture
+All inbound client traffic is proxied through an edge Nginx load balancing reverse proxy:
+- **TLS Termination**: Full TLSv1.2 and TLSv1.3 support with forward-secrecy cipher suites (`ECDHE-ECDSA-AES128-GCM-SHA256`, `ECDHE-RSA-AES128-GCM-SHA256`, etc.).
+- **Automatic HTTPS Enforcement**: Catch-all HTTP (port 80) server permanently redirects all plain requests to HTTPS (port 443) with HTTP 301.
+- **Load Balancing Algorithm**: Uses `least_conn` to distribute incoming queries to backend instances with the fewest active connections, with automated failover (`max_fails=3 fail_timeout=10s`) and persistent HTTP/1.1 connection keepalive pools (`keepalive 32`).
+- **Dual-Tier Rate Limiting**:
+  - `api_general`: 30 requests/sec per client IP with a burst cushion of 50.
+  - `api_auth`: Dedicated 5 requests/sec zone with a burst cap of 10 on `/api/v1/auth/` to prevent brute-force attacks and credential stuffing.
+- **OWASP Defense-in-Depth Headers**:
+  - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload`
+  - `X-Frame-Options: SAMEORIGIN` (Clickjacking defense)
+  - `X-Content-Type-Options: nosniff` (MIME sniffing defense)
+  - `X-XSS-Protection: 1; mode=block`
+  - `Referrer-Policy: strict-origin-when-cross-origin`
+  - `Permissions-Policy: camera=(), microphone=*, geolocation=(), payment=()`
+  - `Content-Security-Policy: default-src 'self' ...`
+- **WAF Rule Shielding**: Drops hidden dotfiles (`.git`, `.env`, `.htaccess`) and probes attempting execution of remote script extensions (`.php`, `.asp`, `.jsp`, `.cgi`).
+
+### 3.6 Model Context Protocol (MCP) Multi-Tenant Security Boundary
+- **Mandatory Authentication**: All incoming MCP requests via HTTP (`POST /api/v1/mcp`) enforce active user authentication via `get_current_active_user`.
+- **Tenancy Isolation & IDOR Immunity**: Workspace IDs provided via `X-Workspace-ID` headers must correspond to verified `WorkspaceMember` records for the requesting user in PostgreSQL. Unauthorized cross-tenant queries receive HTTP `403 Forbidden`.
+- **Demo Backdoor Deactivation**: Sandbox demo logins are disabled by default (`ALLOW_DEMO_LOGIN=False`). When enabled in isolated test environments, credentials map exclusively to ephemeral sandbox accounts.
+- **SSRF Redirect Verification**: The web crawler disables automatic redirects, re-running IP and CIDR validation on every intermediate redirection hop (`Location` header) to prevent SSRF bypasses via external 302 redirects.
+- **Path Traversal Defense**: File downloads strictly resolve storage keys against canonical base directories, rejecting relative path traversal characters (`../`).
+
+
+

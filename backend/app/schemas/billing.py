@@ -175,6 +175,15 @@ class AuditEventResponse(BaseModel):
     created_at: datetime
 
 
+class AuditChainVerificationResponse(BaseModel):
+    is_valid: bool
+    total_records_checked: int
+    tampered_record_id: str | None = None
+    chain_head_hash: str
+    message: str
+    verified_at: datetime
+
+
 class SystemOverviewResponse(BaseModel):
     total_users: int
     total_workspaces: int
@@ -182,3 +191,48 @@ class SystemOverviewResponse(BaseModel):
     total_documents: int
     plans_distribution: dict[str, int]
     health: dict[str, Any]
+
+
+class MerkleAuditRootRequest(BaseModel):
+    workspace_id: str | None = None
+    start_date: datetime | None = None
+    end_date: datetime | None = None
+    action_filter: str | None = None
+
+
+class MerkleAuditRootResponse(BaseModel):
+    merkle_root: str
+    total_leaves: int
+    tree_depth: int
+    workspace_id: str | None = None
+    generated_at: datetime
+
+
+class MerkleProofRequest(BaseModel):
+    event_id: str
+    workspace_id: str | None = None
+
+
+class MerkleProofResponse(BaseModel):
+    event_id: str
+    action: str
+    leaf_hash: str
+    leaf_index: int
+    merkle_root: str
+    total_leaves: int
+    audit_path: list[dict[str, str]]
+    generated_at: datetime
+
+
+class MerkleProofVerificationRequest(BaseModel):
+    leaf_hash: str
+    merkle_root: str
+    audit_path: list[dict[str, str]]
+
+
+class MerkleProofVerificationResponse(BaseModel):
+    is_valid: bool
+    computed_root: str
+    expected_root: str
+    message: str
+    verified_at: datetime

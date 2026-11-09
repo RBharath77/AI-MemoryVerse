@@ -6,7 +6,7 @@ from typing import Any
 import httpx
 from fastapi import HTTPException, status
 
-from app.core.ssrf import validate_url_safe
+from app.core.ssrf import validate_and_resolve_url_safe
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +45,7 @@ class WebpageImporter:
     @classmethod
     async def import_url(cls, url: str) -> dict[str, Any]:
         """Validate SSRF safety, download public webpage, and extract content."""
-        safe_url = validate_url_safe(url)
+        safe_url, _ = validate_and_resolve_url_safe(url)
 
         headers = {
             "User-Agent": "AI-MemoryVerse-Bot/1.0 (+https://ai-memoryverse.onrender.com)",
@@ -53,12 +53,29 @@ class WebpageImporter:
         }
 
         try:
+            current_target = safe_url
             async with httpx.AsyncClient(
                 timeout=12.0,
-                follow_redirects=True,
-                max_redirects=3,
+                follow_redirects=False,
             ) as client:
-                resp = await client.get(safe_url, headers=headers)
+                resp = None
+                for redirect_hop in range(4):  # Allow max 3 redirects
+                    resp = await client.get(current_target, headers=headers)
+                    if resp.is_redirect:
+                        location = resp.headers.get("location")
+                        if not location:
+                            break
+                        # Resolve relative URLs and re-verify SSRF safety for destination
+                        resolved_url = str(httpx.URL(current_target).join(location))
+                        current_target, _ = validate_and_resolve_url_safe(resolved_url)
+                    else:
+                        break
+
+                if resp is None:
+                    raise HTTPException(
+                        status_code=status.HTTP_400_BAD_REQUEST,
+                        detail="No response received from target URL.",
+                    )
 
                 # Validate status
                 if resp.status_code >= 400:

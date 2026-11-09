@@ -1,13 +1,14 @@
 import logging
 from typing import Any
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user, get_current_workspace
 from app.core.database import get_db
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.agent import (
     APITokenCreate,
     APITokenCreatedResponse,
@@ -19,6 +20,26 @@ from app.services.agent_service import AgentService
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/tokens", tags=["tokens"])
+
+
+async def verify_workspace_admin_or_owner(
+    db: AsyncSession,
+    workspace_id: str,
+    user_id: str,
+    is_superuser: bool,
+) -> None:
+    if is_superuser:
+        return
+    q = select(WorkspaceMember).where(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == user_id,
+    )
+    member = (await db.execute(q)).scalar_one_or_none()
+    if not member or member.role not in [WorkspaceRole.OWNER, WorkspaceRole.ADMIN]:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Only workspace owners and administrators can create or revoke API tokens.",
+        )
 
 
 @router.get("", response_model=APIResponse[list[APITokenResponse]])
@@ -60,6 +81,12 @@ async def create_token(
     current_workspace: Workspace = Depends(get_current_workspace),
 ) -> APIResponse[APITokenCreatedResponse]:
     """Generate a new programmatic API token. The plaintext token is displayed ONLY once."""
+    await verify_workspace_admin_or_owner(
+        db=db,
+        workspace_id=current_workspace.id,
+        user_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+    )
     token_obj, raw_secret = await AgentService.create_api_token(
         db=db,
         workspace_id=current_workspace.id,
@@ -88,6 +115,12 @@ async def revoke_token(
     current_workspace: Workspace = Depends(get_current_workspace),
 ) -> APIResponse[dict[str, Any]]:
     """Revoke an API token immediately."""
+    await verify_workspace_admin_or_owner(
+        db=db,
+        workspace_id=current_workspace.id,
+        user_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+    )
     await AgentService.revoke_api_token(
         db=db,
         workspace_id=current_workspace.id,

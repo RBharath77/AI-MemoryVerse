@@ -5,17 +5,19 @@ Revises: 0007_agents_and_integrations
 Create Date: 2026-11-05 16:30:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "0008_billing_and_admin"
-down_revision: Union[str, None] = "0007_agents_and_integrations"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0007_agents_and_integrations"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -74,9 +76,7 @@ def upgrade() -> None:
             server_default=sa.func.now(),
         ),
     )
-    op.create_index(
-        "ix_subscriptions_workspace_id", "subscriptions", ["workspace_id"]
-    )
+    op.create_index("ix_subscriptions_workspace_id", "subscriptions", ["workspace_id"])
 
     # 2. invoices
     op.create_table(
@@ -152,4 +152,3 @@ def downgrade() -> None:
     op.drop_table("audit_events")
     op.drop_table("invoices")
     op.drop_table("subscriptions")
-

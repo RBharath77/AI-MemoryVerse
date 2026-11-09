@@ -2,7 +2,7 @@ import math
 from dataclasses import dataclass, field
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.factory import get_embedding_provider
@@ -63,6 +63,9 @@ class HybridSearchEngine:
         vector_ranked: list[str] = []
         keyword_ranked: list[str] = []
 
+        # Bound candidate pool to prevent unbounded memory heap growth and DoS
+        max_candidates = max(top_k * 25, 250)
+
         # 1. Retrieve Memories
         if include_memories:
             mem_q = select(Memory).where(
@@ -72,6 +75,9 @@ class HybridSearchEngine:
             if filter_category:
                 mem_q = mem_q.where(Memory.category == filter_category)
 
+            mem_q = mem_q.order_by(desc(Memory.importance), desc(Memory.created_at)).limit(
+                max_candidates
+            )
             memories = (await db.execute(mem_q)).scalars().all()
 
             for mem in memories:
@@ -100,6 +106,7 @@ class HybridSearchEngine:
                         "tags": mem.tags,
                         "kw_score": round(kw_score, 4),
                         "vec_score": round(vec_score, 4),
+                        "created_at": mem.created_at.isoformat() if mem.created_at else None,
                     },
                 )
                 all_candidates[item_key] = item
@@ -115,6 +122,8 @@ class HybridSearchEngine:
                 select(DocumentChunk, Document.title)
                 .join(Document, DocumentChunk.document_id == Document.id)
                 .where(DocumentChunk.workspace_id == workspace_id)
+                .order_by(desc(DocumentChunk.created_at))
+                .limit(max_candidates)
             )
             chunk_rows = (await db.execute(chunk_q)).all()
 
@@ -143,6 +152,7 @@ class HybridSearchEngine:
                         "token_count": chunk.token_count,
                         "kw_score": round(kw_score, 4),
                         "vec_score": round(vec_score, 4),
+                        "created_at": chunk.created_at.isoformat() if chunk.created_at else None,
                     },
                 )
                 all_candidates[item_key] = item

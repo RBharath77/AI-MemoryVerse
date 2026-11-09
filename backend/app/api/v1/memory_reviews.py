@@ -1,10 +1,11 @@
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user, get_current_workspace
 from app.core.database import get_db
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.common import APIResponse, PaginatedResponse
 from app.schemas.memory import MemoryReviewAction, MemoryReviewResponse
 from app.services.memory_service import MemoryService
@@ -50,12 +51,22 @@ async def act_on_memory_review(
     current_workspace: Workspace = Depends(get_current_workspace),
     db: AsyncSession = Depends(get_db),
 ):
+    is_admin_or_owner = current_user.is_superuser
+    if not is_admin_or_owner:
+        q = select(WorkspaceMember.role).where(
+            WorkspaceMember.workspace_id == current_workspace.id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        role = (await db.execute(q)).scalar_one_or_none()
+        is_admin_or_owner = role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+
     review = await MemoryService.act_on_review(
         db=db,
         workspace_id=current_workspace.id,
         review_id=review_id,
         user_id=current_user.id,
         action=action,
+        is_admin_or_owner=is_admin_or_owner,
     )
     return APIResponse(
         success=True,

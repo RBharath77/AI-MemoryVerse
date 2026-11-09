@@ -270,30 +270,6 @@ export default function AdminPage() {
         </div>
       </div>
 
-      {/* Subscription Breakdown */}
-      {overview?.plans_distribution && (
-        <div className="p-6 bg-navy-900/60 border border-navy-800 rounded-xl space-y-4">
-          <h3 className="text-sm font-semibold text-white">
-            Workspace Subscription Tier Distribution
-          </h3>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {Object.entries(overview.plans_distribution).map(([tier, count]) => (
-              <div
-                key={tier}
-                className="p-3 bg-navy-950/70 border border-navy-800 rounded-lg flex items-center justify-between"
-              >
-                <span className="text-xs font-bold uppercase text-slate-300">
-                  {tier}
-                </span>
-                <span className="font-mono text-sm font-extrabold text-cyan-400">
-                  {count} workspaces
-                </span>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
       {/* Security Audit Log Stream */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">

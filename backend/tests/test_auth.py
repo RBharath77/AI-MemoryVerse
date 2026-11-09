@@ -44,15 +44,61 @@ async def test_register_duplicate_email(client: AsyncClient):
 
 @pytest.mark.asyncio
 async def test_register_weak_password_validation(client: AsyncClient):
-    payload = {
-        "email": "weak@memoryverse.ai",
-        "password": "short",  # Less than 8 chars
-        "full_name": "Weak Pass",
-    }
-    response = await client.post("/api/v1/auth/register", json=payload)
-    assert response.status_code == 422
-    body = response.json()
-    assert body["success"] is False
+    # Case 1: Less than 8 characters
+    res_short = await client.post(
+        "/api/v1/auth/register",
+        json={"email": "short@memoryverse.ai", "password": "Sh0!", "full_name": "Short Pass"},
+    )
+    assert res_short.status_code == 422
+    assert res_short.json()["success"] is False
+
+    # Case 2: Missing uppercase
+    res_no_upper = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "noupper@memoryverse.ai",
+            "password": "password123!",
+            "full_name": "No Upper",
+        },
+    )
+    assert res_no_upper.status_code == 422
+    assert "uppercase" in str(res_no_upper.json()).lower()
+
+    # Case 3: Missing lowercase
+    res_no_lower = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "nolower@memoryverse.ai",
+            "password": "PASSWORD123!",
+            "full_name": "No Lower",
+        },
+    )
+    assert res_no_lower.status_code == 422
+    assert "lowercase" in str(res_no_lower.json()).lower()
+
+    # Case 4: Missing numeric digit
+    res_no_digit = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "nodigit@memoryverse.ai",
+            "password": "PasswordSpecial!",
+            "full_name": "No Digit",
+        },
+    )
+    assert res_no_digit.status_code == 422
+    assert "digit" in str(res_no_digit.json()).lower()
+
+    # Case 5: Missing special symbol
+    res_no_symbol = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "nosymbol@memoryverse.ai",
+            "password": "Password12345",
+            "full_name": "No Symbol",
+        },
+    )
+    assert res_no_symbol.status_code == 422
+    assert "symbol" in str(res_no_symbol.json()).lower()
 
 
 @pytest.mark.asyncio
@@ -152,7 +198,13 @@ async def test_forgot_and_reset_password(client: AsyncClient):
         "password": "OldPassword123!",
         "full_name": "Reset Tester",
     }
-    await client.post("/api/v1/auth/register", json=reg_payload)
+    reg_res = await client.post("/api/v1/auth/register", json=reg_payload)
+    old_token = reg_res.json()["data"]["tokens"]["access_token"]
+    old_headers = {"Authorization": f"Bearer {old_token}"}
+
+    # Verify old token works before reset
+    pre_res = await client.get("/api/v1/auth/me", headers=old_headers)
+    assert pre_res.status_code == 200
 
     # Request password reset
     forgot_res = await client.post(
@@ -173,6 +225,11 @@ async def test_forgot_and_reset_password(client: AsyncClient):
     )
     assert reset_res.status_code == 200
     assert reset_res.json()["success"] is True
+
+    # Phase 4 Hardening: Old access token must now be rejected with 401
+    post_res = await client.get("/api/v1/auth/me", headers=old_headers)
+    assert post_res.status_code == 401
+    assert "revoked" in post_res.json()["error"]["message"].lower()
 
     # Old password should now fail
     old_login = await client.post(

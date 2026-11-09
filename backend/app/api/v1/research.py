@@ -2,17 +2,20 @@ import logging
 from typing import Any
 
 from fastapi import APIRouter, Depends, Query
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user, get_current_workspace
 from app.core.database import get_db
 from app.models.research import ReportType
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.common import APIResponse
 from app.schemas.research import (
     InsightListResponse,
     InsightResponse,
+    NarrativeSynthesisRequest,
+    NarrativeSynthesisResponse,
     ReportGenerateRequest,
     ReportListResponse,
     ReportResponse,
@@ -94,6 +97,27 @@ async def generate_report(
     )
 
 
+@router.post("/narrative-synthesis", response_model=APIResponse[NarrativeSynthesisResponse])
+async def synthesize_contextual_narrative(
+    data: NarrativeSynthesisRequest,
+    db: AsyncSession = Depends(get_db),
+    current_workspace: Workspace = Depends(get_current_workspace),
+) -> APIResponse[NarrativeSynthesisResponse]:
+    """
+    Contextual Narrative Memory Synthesis & Executive Storytelling.
+    Structures multi-source workspace memories and knowledge graph milestones into a
+    coherent, multi-act chronological narrative briefing with grounded citations.
+    """
+    from app.ai.narrative_synthesis import NarrativeSynthesisEngine
+
+    result = await NarrativeSynthesisEngine.synthesize(
+        db=db,
+        workspace_id=current_workspace.id,
+        request=data,
+    )
+    return APIResponse(success=True, data=result)
+
+
 @router.get("/reports/{report_id}", response_model=APIResponse[ReportResponse])
 async def get_report(
     report_id: str,
@@ -133,11 +157,22 @@ async def delete_report(
     current_user: User = Depends(get_current_active_user),
     current_workspace: Workspace = Depends(get_current_workspace),
 ) -> APIResponse[dict[str, Any]]:
-    """Delete a research report."""
+    """Delete a research report (creator, admin, or owner only)."""
+    is_admin_or_owner = current_user.is_superuser
+    if not is_admin_or_owner:
+        q = select(WorkspaceMember.role).where(
+            WorkspaceMember.workspace_id == current_workspace.id,
+            WorkspaceMember.user_id == current_user.id,
+        )
+        role = (await db.execute(q)).scalar_one_or_none()
+        is_admin_or_owner = role in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN)
+
     await ResearchService.delete_report(
         db=db,
         workspace_id=current_workspace.id,
         report_id=report_id,
+        current_user_id=current_user.id,
+        is_admin_or_owner=is_admin_or_owner,
     )
     return APIResponse(success=True, data={"deleted": True})
 
@@ -230,3 +265,27 @@ async def dismiss_insight(
             created_at=insight.created_at,
         ),
     )
+
+
+@router.post(
+    "/narrative-synthesis",
+    response_model=APIResponse[NarrativeSynthesisResponse],
+)
+async def synthesize_narrative(
+    data: NarrativeSynthesisRequest,
+    db: AsyncSession = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+    current_workspace: Workspace = Depends(get_current_workspace),
+) -> APIResponse[NarrativeSynthesisResponse]:
+    """
+    Contextual Narrative Memory Synthesis & Executive Storytelling Engine.
+    Structures multi-source workspace memories into a coherent, multi-act chronological narrative briefing.
+    """
+    from app.ai.narrative_synthesis import NarrativeSynthesisEngine
+
+    result = await NarrativeSynthesisEngine.synthesize(
+        db=db,
+        workspace_id=current_workspace.id,
+        request=data,
+    )
+    return APIResponse(success=True, data=result)

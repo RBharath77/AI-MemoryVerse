@@ -358,7 +358,7 @@ async def test_scenario_10_cascade_deletion_handling(client: AsyncClient, auth_h
 
 @pytest.mark.asyncio
 async def test_scenario_11_and_12_worker_health_and_system_readiness(
-    client: AsyncClient, auth_headers: dict
+    client: AsyncClient, admin_headers: dict
 ):
     """Scenarios 11 & 12: Verify system readiness, health probes, and background
     worker telemetry.
@@ -374,7 +374,7 @@ async def test_scenario_11_and_12_worker_health_and_system_readiness(
     assert ready_res.json()["status"] == "ready"
 
     # 3. Admin Overview Telemetry
-    admin_res = await client.get("/api/v1/admin/overview", headers=auth_headers)
+    admin_res = await client.get("/api/v1/admin/overview", headers=admin_headers)
     assert admin_res.status_code == 200
     data = admin_res.json()["data"]
     assert "health" in data
@@ -465,6 +465,7 @@ async def test_security_unauthenticated_access_denial(client: AsyncClient):
         ("/api/v1/graph", "GET"),
         ("/api/v1/tokens", "GET"),
         ("/api/v1/agents/tasks", "GET"),
+        ("/api/v1/mcp", "POST"),
     ]
 
     for path, method in protected_endpoints:
@@ -473,3 +474,94 @@ async def test_security_unauthenticated_access_denial(client: AsyncClient):
         else:
             res = await client.post(path, json={})
         assert res.status_code == 401, f"Expected 401 for {path}, got {res.status_code}"
+
+
+@pytest.mark.asyncio
+async def test_full_integrated_platform_journey_and_security_gates(
+    client: AsyncClient,
+):
+    """Phase 3 E2E: Unified end-to-end user journey across all security gates."""
+    import io
+    import uuid
+
+    # 1. Register with strong password policy
+    reg_res = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "journey_pilot@memoryverse.ai",
+            "password": "PilotPassword2026!#",
+            "full_name": "Pilot User",
+            "workspace_name": "Pilot Operations",
+        },
+    )
+    assert reg_res.status_code == 201
+    auth_data = reg_res.json()["data"]
+    token = auth_data["tokens"]["access_token"]
+    ws_id = auth_data["workspace"]["id"]
+    headers = {"Authorization": f"Bearer {token}", "X-Workspace-ID": ws_id}
+
+    # 2. Upload document & verify streaming download
+    doc_content = "Pilot Operations Manual 2026: Systems nominal, pgvector operational."
+    files = {
+        "file": (
+            "pilot_manual.txt",
+            io.BytesIO(doc_content.encode("utf-8")),
+            "text/plain",
+        )
+    }
+    upload_res = await client.post("/api/v1/documents/upload", files=files, headers=headers)
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["data"]["document"]["id"]
+
+    # Stream download via raw endpoint
+    raw_res = await client.get(f"/api/v1/documents/{doc_id}/raw", headers=headers)
+    assert raw_res.status_code == 200
+    assert raw_res.text == doc_content
+
+    # 3. Add memory and verify retrieval
+    mem_res = await client.post(
+        "/api/v1/memories",
+        headers=headers,
+        json={
+            "content": "Pilot clearance protocol: Quantum entanglement encryption active.",
+            "category": "project",
+            "importance": 9,
+        },
+    )
+    assert mem_res.status_code == 201
+
+    # 4. Hybrid search retrieving both memory and document
+    search_res = await client.post(
+        "/api/v1/search/hybrid",
+        headers=headers,
+        json={"query": "Pilot operations quantum", "top_k": 5},
+    )
+    assert search_res.status_code == 200
+    search_data = search_res.json()["data"]
+    assert len(search_data["results"]) >= 1
+
+    # 5. MCP JSON-RPC tool call with tenant verification
+    mcp_call = {
+        "jsonrpc": "2.0",
+        "id": 888,
+        "method": "tools/call",
+        "params": {
+            "name": "memoryverse_search",
+            "arguments": {"query": "Pilot"},
+        },
+    }
+    mcp_res = await client.post("/api/v1/mcp", json=mcp_call, headers=headers)
+    assert mcp_res.status_code == 200
+    assert "result" in mcp_res.json()
+
+    # 6. MCP IDOR injection attempt must be blocked
+    fake_ws = str(uuid.uuid4())
+    idor_headers = {**headers, "X-Workspace-ID": fake_ws}
+    idor_res = await client.post("/api/v1/mcp", json=mcp_call, headers=idor_headers)
+    assert idor_res.status_code == 403
+
+    # 7. Health and readiness endpoints
+    h_res = await client.get("/health")
+    assert h_res.status_code == 200
+    r_res = await client.get("/ready")
+    assert r_res.status_code == 200

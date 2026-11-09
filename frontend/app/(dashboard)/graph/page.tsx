@@ -3,20 +3,21 @@
 import { useEffect, useState, useRef, useMemo } from "react";
 import {
   GitFork,
-  Search,
   Plus,
-  RefreshCw,
-  Layers,
-  Sparkles,
-  Trash2,
-  X,
+  Search,
+  Filter,
   Maximize2,
   ZoomIn,
   ZoomOut,
-  ChevronRight,
-  Shield,
+  RotateCcw,
+  Sparkles,
+  Layers,
   Activity,
+  Shield,
+  Trash2,
+  ExternalLink,
   ArrowRight,
+  X,
   Code,
   FolderGit2,
   User,
@@ -51,7 +52,8 @@ interface GraphEdge {
 interface GraphAnalytics {
   total_entities: number;
   total_relationships: number;
-  entities_by_type: Record<string, number>;
+  entity_type_breakdown?: Record<string, number>;
+  entities_by_type?: Record<string, number>;
   top_central_entities: Array<{
     id: string;
     name: string;
@@ -67,51 +69,51 @@ const ENTITY_CONFIG: Record<
 > = {
   technology: {
     label: "Technology",
-    color: "text-emerald-400",
-    bg: "rgba(16, 185, 129, 0.15)",
+    color: "text-emerald-500",
+    bg: "rgba(16, 185, 129, 0.12)",
     border: "#10b981",
     icon: Code,
   },
   project: {
     label: "Project",
-    color: "text-violet-400",
-    bg: "rgba(139, 92, 246, 0.15)",
-    border: "#8b5cf6",
+    color: "text-[#014BAA]",
+    bg: "rgba(1, 75, 170, 0.12)",
+    border: "#014BAA",
     icon: FolderGit2,
   },
   person: {
     label: "Person",
-    color: "text-amber-400",
-    bg: "rgba(245, 158, 11, 0.15)",
+    color: "text-amber-500",
+    bg: "rgba(245, 158, 11, 0.12)",
     border: "#f59e0b",
     icon: User,
   },
   organization: {
     label: "Organization",
-    color: "text-blue-400",
-    bg: "rgba(59, 130, 246, 0.15)",
-    border: "#3b82f6",
+    color: "text-blue-600",
+    bg: "rgba(37, 99, 235, 0.12)",
+    border: "#2563eb",
     icon: Building,
   },
   concept: {
     label: "Concept",
-    color: "text-indigo-400",
-    bg: "rgba(99, 102, 241, 0.15)",
-    border: "#6366f1",
+    color: "text-indigo-600",
+    bg: "rgba(79, 70, 229, 0.12)",
+    border: "#4f46e5",
     icon: Lightbulb,
   },
   location: {
     label: "Location",
-    color: "text-rose-400",
-    bg: "rgba(244, 63, 94, 0.15)",
+    color: "text-rose-500",
+    bg: "rgba(244, 63, 94, 0.12)",
     border: "#f43f5e",
     icon: MapPin,
   },
   event: {
     label: "Event",
-    color: "text-cyan-400",
-    bg: "rgba(6, 182, 212, 0.15)",
-    border: "#06b6d4",
+    color: "text-cyan-600",
+    bg: "rgba(8, 145, 178, 0.12)",
+    border: "#0891b2",
     icon: Calendar,
   },
 };
@@ -162,7 +164,7 @@ export default function KnowledgeGraphPage() {
     setIsLoading(true);
     try {
       const [graphRes, analyticsRes] = await Promise.all([
-        api.get<any>("/graph/workspace"),
+        api.get<any>("/graph"),
         api.get<any>("/graph/analytics"),
       ]);
 
@@ -172,7 +174,7 @@ export default function KnowledgeGraphPage() {
         setNodes(fetchedNodes);
         setEdges(fetchedEdges);
 
-        // Calculate positions using circular / force layout
+        // Calculate positions using circular layout
         const positions: Record<string, { x: number; y: number }> = {};
         const count = fetchedNodes.length;
         const centerX = 450;
@@ -184,7 +186,6 @@ export default function KnowledgeGraphPage() {
             positions[node.id] = { x: centerX, y: centerY };
           } else {
             const angle = (2 * Math.PI * i) / count;
-            // Introduce slight orbit offsets for degree
             const r = radius * (0.8 + ((node.degree || 1) % 3) * 0.15);
             positions[node.id] = {
               x: centerX + r * Math.cos(angle),
@@ -244,12 +245,19 @@ export default function KnowledgeGraphPage() {
     return { outgoing, incoming };
   }, [selectedNode, edges]);
 
-  // Pan handlers
+  // Pan & Zoom handlers
   const handleMouseDown = (e: React.MouseEvent) => {
-    if ((e.target as HTMLElement).tagName === "svg") {
+    const targetTag = (e.target as Element).tagName.toLowerCase();
+    if (targetTag === "svg" || targetTag === "g") {
       setIsPanning(true);
       setStartPan({ x: e.clientX - pan.x, y: e.clientY - pan.y });
     }
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom((prev) => Math.min(Math.max(Number((prev + delta).toFixed(2)), 0.4), 2.5));
   };
 
   const handleMouseMove = (e: React.MouseEvent) => {
@@ -387,11 +395,11 @@ export default function KnowledgeGraphPage() {
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-white flex items-center gap-2">
-            <GitFork className="h-6 w-6 text-purple-400" />
+          <h1 className="text-2xl font-bold tracking-tight text-[#282B4A] dark:text-white flex items-center gap-2">
+            <GitFork className="h-6 w-6 text-[#014BAA]" />
             Knowledge Graph
           </h1>
-          <p className="text-sm text-slate-400 mt-1">
+          <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
             Explore interconnected entities, technologies, projects, and relationships extracted across your memory vault.
           </p>
         </div>
@@ -399,7 +407,7 @@ export default function KnowledgeGraphPage() {
         <div className="flex items-center gap-2">
           <button
             onClick={() => setIsExtractOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg bg-purple-500/10 text-purple-300 border border-purple-500/30 hover:bg-purple-500/20 transition-all"
+            className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-xl bg-[#014BAA]/10 text-[#014BAA] dark:text-[#F8F3F0] dark:bg-[#014BAA]/25 border border-[#014BAA]/30 hover:bg-[#014BAA]/20 transition-all shadow-sm"
           >
             <Sparkles className="h-4 w-4" />
             Extract from Text
@@ -407,14 +415,14 @@ export default function KnowledgeGraphPage() {
           <button
             onClick={() => setIsCreateRelOpen(true)}
             disabled={nodes.length < 2}
-            className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg bg-slate-800 text-slate-200 border border-slate-700 hover:bg-slate-700 transition-all disabled:opacity-50"
+            className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-xl bg-white dark:bg-navy-900 text-[#282B4A] dark:text-slate-200 border border-[#EEEBDA] dark:border-navy-800 hover:bg-slate-50 dark:hover:bg-navy-850 transition-all disabled:opacity-50 shadow-sm"
           >
-            <Plus className="h-4 w-4" />
+            <Plus className="h-4 w-4 text-[#014BAA] dark:text-blue-400" />
             Add Connection
           </button>
           <button
             onClick={() => setIsCreateEntityOpen(true)}
-            className="flex items-center gap-2 px-3.5 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 transition-all shadow-lg shadow-purple-900/30"
+            className="flex items-center gap-2 px-3.5 py-2 text-sm font-semibold rounded-xl bg-[#014BAA] text-[#F8F3F0] hover:bg-[#014BAA]/90 transition-all shadow-md shadow-[#014BAA]/25"
           >
             <Plus className="h-4 w-4" />
             New Entity
@@ -424,61 +432,63 @@ export default function KnowledgeGraphPage() {
 
       {/* Analytics KPI Ribbon */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+        <div className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/60 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Entities
             </span>
-            <Layers className="h-4 w-4 text-purple-400" />
+            <Layers className="h-4 w-4 text-[#014BAA]" />
           </div>
-          <p className="text-2xl font-bold text-white mt-1">
+          <p className="text-2xl font-extrabold text-[#282B4A] dark:text-white mt-1">
             {analytics?.total_entities ?? nodes.length}
           </p>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+        <div className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/60 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Connections
             </span>
-            <GitFork className="h-4 w-4 text-blue-400" />
+            <GitFork className="h-4 w-4 text-[#014BAA]" />
           </div>
-          <p className="text-2xl font-bold text-white mt-1">
+          <p className="text-2xl font-extrabold text-[#282B4A] dark:text-white mt-1">
             {analytics?.total_relationships ?? edges.length}
           </p>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+        <div className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/60 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Entity Types
             </span>
-            <Activity className="h-4 w-4 text-emerald-400" />
+            <Activity className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
           </div>
-          <p className="text-2xl font-bold text-white mt-1">
-            {analytics?.entities_by_type
+          <p className="text-2xl font-extrabold text-[#282B4A] dark:text-white mt-1">
+            {analytics?.entity_type_breakdown
+              ? Object.keys(analytics.entity_type_breakdown).length
+              : analytics?.entities_by_type
               ? Object.keys(analytics.entities_by_type).length
               : 0}
           </p>
         </div>
 
-        <div className="p-4 rounded-xl border border-slate-800 bg-slate-900/60 backdrop-blur">
+        <div className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/60 shadow-sm">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-400 uppercase tracking-wider">
+            <span className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
               Key Hub
             </span>
-            <Shield className="h-4 w-4 text-amber-400" />
+            <Shield className="h-4 w-4 text-amber-600 dark:text-amber-400" />
           </div>
-          <p className="text-base font-semibold text-white mt-1 truncate">
+          <p className="text-base font-bold text-[#014BAA] dark:text-amber-400 mt-1 truncate">
             {analytics?.top_central_entities?.[0]?.name || "None yet"}
           </p>
         </div>
       </div>
 
       {/* Main Interactive Graph Canvas & Controls */}
-      <div className="relative rounded-2xl border border-slate-800 bg-slate-950/70 overflow-hidden min-h-[640px] flex flex-col">
+      <div className="relative rounded-2xl border border-[#EEEBDA] dark:border-navy-800 bg-[#F8F3F0] dark:bg-navy-950/70 overflow-hidden min-h-[640px] flex flex-col shadow-sm">
         {/* Controls Bar */}
-        <div className="p-3 border-b border-slate-800 flex flex-wrap items-center justify-between gap-3 bg-slate-900/50 backdrop-blur z-10">
+        <div className="p-3 border-b border-[#EEEBDA] dark:border-navy-800 flex flex-wrap items-center justify-between gap-3 bg-white/95 dark:bg-navy-900/80 backdrop-blur z-10 shadow-xs">
           <div className="flex items-center gap-2 flex-1 max-w-sm">
             <div className="relative w-full">
               <Search className="h-4 w-4 absolute left-3 top-2.5 text-slate-400" />
@@ -487,7 +497,7 @@ export default function KnowledgeGraphPage() {
                 placeholder="Search entities..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full bg-slate-900 border border-slate-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-purple-500"
+                className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg pl-9 pr-3 py-1.5 text-xs text-[#282B4A] dark:text-white placeholder-slate-400 focus:outline-none focus:border-[#014BAA]"
               />
             </div>
           </div>
@@ -496,7 +506,7 @@ export default function KnowledgeGraphPage() {
             <select
               value={selectedType}
               onChange={(e) => setSelectedType(e.target.value)}
-              className="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1.5 text-xs text-slate-300 focus:outline-none focus:border-purple-500"
+              className="bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-2.5 py-1.5 text-xs text-[#282B4A] dark:text-slate-300 focus:outline-none focus:border-[#014BAA]"
             >
               <option value="all">All Entity Types</option>
               {Object.entries(ENTITY_CONFIG).map(([key, cfg]) => (
@@ -506,60 +516,53 @@ export default function KnowledgeGraphPage() {
               ))}
             </select>
 
-            <div className="h-4 w-px bg-slate-800 mx-1" />
+            <div className="h-4 w-px bg-[#EEEBDA] dark:bg-navy-800 mx-1" />
 
             <button
               onClick={() => setZoom((z) => Math.min(z + 0.2, 2.5))}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+              className="p-1.5 rounded-lg bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 text-[#282B4A] dark:text-slate-300 hover:text-[#014BAA] hover:bg-white dark:hover:bg-navy-900 shadow-xs"
               title="Zoom In"
             >
               <ZoomIn className="h-4 w-4" />
             </button>
             <button
               onClick={() => setZoom((z) => Math.max(z - 0.2, 0.4))}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+              className="p-1.5 rounded-lg bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 text-[#282B4A] dark:text-slate-300 hover:text-[#014BAA] hover:bg-white dark:hover:bg-navy-900 shadow-xs"
               title="Zoom Out"
             >
               <ZoomOut className="h-4 w-4" />
             </button>
             <button
               onClick={resetView}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
+              className="p-1.5 rounded-lg bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 text-[#282B4A] dark:text-slate-300 hover:text-[#014BAA] hover:bg-white dark:hover:bg-navy-900 shadow-xs"
               title="Reset View"
             >
-              <Maximize2 className="h-4 w-4" />
-            </button>
-            <button
-              onClick={fetchGraphData}
-              className="p-1.5 rounded-lg bg-slate-900 border border-slate-800 text-slate-300 hover:text-white hover:bg-slate-800"
-              title="Refresh Graph"
-            >
-              <RefreshCw className="h-4 w-4" />
+              <RotateCcw className="h-4 w-4" />
             </button>
           </div>
         </div>
 
-        {/* Graph Canvas */}
-        <div className="relative flex-1 w-full h-full min-h-[560px] select-none bg-[radial-gradient(#1e293b_1px,transparent_1px)] [background-size:20px_20px]">
+        {/* Canvas Area with Vanilla Canvas Dots */}
+        <div className="relative flex-1 w-full h-full min-h-[560px] select-none bg-[radial-gradient(#d3cebe_1px,transparent_1px)] dark:bg-[radial-gradient(#34385C_1px,transparent_1px)] [background-size:20px_20px]">
           {isLoading ? (
-            <div className="absolute inset-0 flex items-center justify-center bg-slate-950/60 backdrop-blur z-20">
-              <Loader2 className="h-8 w-8 text-purple-400 animate-spin" />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <Loader2 className="h-8 w-8 text-[#014BAA] animate-spin" />
             </div>
           ) : nodes.length === 0 ? (
-            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center z-10">
-              <div className="w-16 h-16 rounded-2xl bg-purple-500/10 border border-purple-500/20 flex items-center justify-center mb-4 text-purple-400">
+            <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+              <div className="w-16 h-16 rounded-2xl bg-[#014BAA]/10 border border-[#014BAA]/20 flex items-center justify-center mb-4 text-[#014BAA]">
                 <GitFork className="h-8 w-8" />
               </div>
-              <h3 className="text-lg font-semibold text-white">
+              <h3 className="text-lg font-bold text-[#282B4A] dark:text-white">
                 No Knowledge Graph Entities Yet
               </h3>
-              <p className="text-sm text-slate-400 max-w-md mt-1 mb-6">
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-md mt-1 mb-6 leading-relaxed">
                 Connect your memory entries into an interconnected graph. Automatically extract entities from texts or seed an initial architecture graph.
               </p>
               <button
                 onClick={seedSampleGraph}
                 disabled={isSubmitting}
-                className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-xl bg-purple-600 text-white hover:bg-purple-500 transition-all shadow-lg shadow-purple-900/30"
+                className="flex items-center gap-2 px-5 py-2.5 text-sm font-semibold rounded-xl bg-[#014BAA] text-[#F8F3F0] hover:bg-[#014BAA]/90 transition-all shadow-md shadow-[#014BAA]/25"
               >
                 {isSubmitting ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
@@ -576,6 +579,8 @@ export default function KnowledgeGraphPage() {
               onMouseDown={handleMouseDown}
               onMouseMove={handleSvgMouseMove}
               onMouseUp={handleSvgMouseUp}
+              onMouseLeave={handleSvgMouseUp}
+              onWheel={handleWheel}
             >
               <defs>
                 <marker
@@ -586,7 +591,7 @@ export default function KnowledgeGraphPage() {
                   refY="3"
                   orient="auto"
                 >
-                  <polygon points="0 0, 8 3, 0 6" fill="#64748b" />
+                  <polygon points="0 0, 8 3, 0 6" fill="#94a3b8" />
                 </marker>
                 <marker
                   id="arrowhead-active"
@@ -596,7 +601,7 @@ export default function KnowledgeGraphPage() {
                   refY="3"
                   orient="auto"
                 >
-                  <polygon points="0 0, 8 3, 0 6" fill="#a855f7" />
+                  <polygon points="0 0, 8 3, 0 6" fill="#014BAA" />
                 </marker>
               </defs>
 
@@ -625,9 +630,8 @@ export default function KnowledgeGraphPage() {
                         y1={srcPos.y}
                         x2={tgtPos.x}
                         y2={tgtPos.y}
-                        stroke={isEdgeActive ? "#a855f7" : "#334155"}
+                        stroke={isEdgeActive ? "#014BAA" : "#94a3b8"}
                         strokeWidth={isEdgeActive ? 2.5 : 1.5}
-                        strokeDasharray={isEdgeActive ? "none" : "none"}
                         markerEnd={
                           isEdgeActive
                             ? "url(#arrowhead-active)"
@@ -640,18 +644,19 @@ export default function KnowledgeGraphPage() {
                         width={70}
                         height={18}
                         rx={4}
-                        fill="#090d16"
-                        stroke={isEdgeActive ? "#a855f7" : "#1e293b"}
+                        fill="#FFFFFF"
+                        stroke={isEdgeActive ? "#014BAA" : "#EEEBDA"}
                         strokeWidth={1}
+                        className="dark:fill-[#181A2C] dark:stroke-[#34385C]"
                       />
                       <text
                         x={midX}
                         y={midY + 3.5}
                         textAnchor="middle"
-                        fill={isEdgeActive ? "#d8b4fe" : "#94a3b8"}
+                        fill={isEdgeActive ? "#014BAA" : "#282B4A"}
                         fontSize="9"
-                        fontWeight="500"
-                        className="select-none pointer-events-none"
+                        fontWeight="600"
+                        className="select-none pointer-events-none dark:fill-[#F8F3F0]"
                       >
                         {edge.relationship_type.replace(/_/g, " ")}
                       </text>
@@ -695,10 +700,10 @@ export default function KnowledgeGraphPage() {
                       {/* Main Node Circle */}
                       <circle
                         r={radius}
-                        fill="#0f172a"
-                        stroke={isSelected ? cfg.border : "#334155"}
+                        fill="#FFFFFF"
+                        stroke={isSelected ? cfg.border : "#EEEBDA"}
                         strokeWidth={isSelected ? 3 : 1.5}
-                        className="transition-colors group-hover:stroke-purple-400 shadow-xl"
+                        className="transition-colors group-hover:stroke-[#014BAA] shadow-md dark:fill-[#1e2238] dark:stroke-[#34385C]"
                       />
                       <circle
                         r={radius - 4}
@@ -710,10 +715,10 @@ export default function KnowledgeGraphPage() {
                       <text
                         y={-2}
                         textAnchor="middle"
-                        fill="#f8fafc"
+                        fill="#282B4A"
                         fontSize="11"
-                        fontWeight="600"
-                        className="pointer-events-none select-none"
+                        fontWeight="bold"
+                        className="pointer-events-none select-none dark:fill-[#F8F3F0]"
                       >
                         {node.name.length > 12
                           ? `${node.name.slice(0, 11)}…`
@@ -724,7 +729,7 @@ export default function KnowledgeGraphPage() {
                         textAnchor="middle"
                         fill={cfg.border}
                         fontSize="8.5"
-                        fontWeight="500"
+                        fontWeight="600"
                         className="pointer-events-none select-none"
                       >
                         {cfg.label}
@@ -733,11 +738,11 @@ export default function KnowledgeGraphPage() {
                       {/* Degree Badge */}
                       {(node.degree || 0) > 0 && (
                         <g transform={`translate(${radius - 8}, ${-radius + 8})`}>
-                          <circle r={8} fill="#1e1b4b" stroke="#8b5cf6" strokeWidth={1} />
+                          <circle r={8} fill="#014BAA" stroke="#FFFFFF" strokeWidth={1} />
                           <text
                             y={3}
                             textAnchor="middle"
-                            fill="#c4b5fd"
+                            fill="#F8F3F0"
                             fontSize="8"
                             fontWeight="bold"
                             className="pointer-events-none select-none"
@@ -755,25 +760,25 @@ export default function KnowledgeGraphPage() {
 
           {/* Selected Node Details Drawer */}
           {selectedNode && (
-            <div className="absolute right-4 top-4 bottom-4 w-80 bg-slate-900/90 border border-slate-800 rounded-xl p-5 shadow-2xl backdrop-blur-md flex flex-col z-30 animate-in fade-in slide-in-from-right duration-200">
-              <div className="flex items-start justify-between pb-3 border-b border-slate-800">
+            <div className="absolute right-4 top-4 bottom-4 w-80 bg-white/95 dark:bg-navy-900/95 border border-[#EEEBDA] dark:border-navy-800 rounded-2xl p-5 shadow-2xl backdrop-blur-md flex flex-col z-30 animate-in fade-in slide-in-from-right duration-200">
+              <div className="flex items-start justify-between pb-3 border-b border-[#EEEBDA] dark:border-navy-800">
                 <div className="flex items-center gap-2">
                   <div
                     className="w-3 h-3 rounded-full"
                     style={{
                       backgroundColor:
                         ENTITY_CONFIG[selectedNode.entity_type]?.border ||
-                        "#8b5cf6",
+                        "#014BAA",
                     }}
                   />
-                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+                  <span className="text-xs font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">
                     {ENTITY_CONFIG[selectedNode.entity_type]?.label ||
                       selectedNode.entity_type}
                   </span>
                 </div>
                 <button
                   onClick={() => setSelectedNode(null)}
-                  className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800"
+                  className="p-1 rounded-lg text-slate-400 hover:text-[#282B4A] dark:hover:text-white hover:bg-slate-100 dark:hover:bg-navy-800 transition-colors"
                 >
                   <X className="h-4 w-4" />
                 </button>
@@ -781,34 +786,34 @@ export default function KnowledgeGraphPage() {
 
               <div className="mt-4 flex-1 overflow-y-auto space-y-4 pr-1">
                 <div>
-                  <h3 className="text-lg font-bold text-white break-words">
+                  <h3 className="text-lg font-bold text-[#282B4A] dark:text-white break-words">
                     {selectedNode.name}
                   </h3>
                   {selectedNode.description ? (
-                    <p className="text-xs text-slate-400 mt-1.5 leading-relaxed">
+                    <p className="text-xs text-slate-600 dark:text-slate-400 mt-1.5 leading-relaxed">
                       {selectedNode.description}
                     </p>
                   ) : (
-                    <p className="text-xs text-slate-500 italic mt-1.5">
+                    <p className="text-xs text-slate-400 italic mt-1.5">
                       No description provided.
                     </p>
                   )}
                 </div>
 
                 <div className="grid grid-cols-2 gap-2 text-center">
-                  <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-medium">
+                  <div className="p-2.5 rounded-lg bg-[#F8F3F0] dark:bg-navy-950/60 border border-[#EEEBDA] dark:border-navy-800">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium">
                       Connections
                     </span>
-                    <p className="text-lg font-bold text-white mt-0.5">
+                    <p className="text-lg font-bold text-[#282B4A] dark:text-white mt-0.5">
                       {selectedNode.degree}
                     </p>
                   </div>
-                  <div className="p-2.5 rounded-lg bg-slate-950/60 border border-slate-800">
-                    <span className="text-[10px] text-slate-400 uppercase font-medium">
+                  <div className="p-2.5 rounded-lg bg-[#F8F3F0] dark:bg-navy-950/60 border border-[#EEEBDA] dark:border-navy-800">
+                    <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase font-medium">
                       Mentions
                     </span>
-                    <p className="text-lg font-bold text-purple-400 mt-0.5">
+                    <p className="text-lg font-bold text-[#014BAA] dark:text-cyan-400 mt-0.5">
                       {selectedNode.mention_count}
                     </p>
                   </div>
@@ -816,13 +821,13 @@ export default function KnowledgeGraphPage() {
 
                 {/* Relationships list */}
                 <div>
-                  <h4 className="text-xs font-semibold text-slate-300 uppercase tracking-wider mb-2">
+                  <h4 className="text-xs font-semibold text-[#282B4A] dark:text-slate-300 uppercase tracking-wider mb-2">
                     Direct Connections
                   </h4>
 
                   {selectedNodeRelationships.outgoing.length === 0 &&
                   selectedNodeRelationships.incoming.length === 0 ? (
-                    <p className="text-xs text-slate-500 italic">
+                    <p className="text-xs text-slate-400 italic">
                       No connections found.
                     </p>
                   ) : (
@@ -834,13 +839,13 @@ export default function KnowledgeGraphPage() {
                         return (
                           <div
                             key={rel.id}
-                            className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80 text-xs flex items-center justify-between"
+                            className="p-2 rounded-lg bg-[#F8F3F0] dark:bg-navy-950/50 border border-[#EEEBDA] dark:border-navy-800/80 text-xs flex items-center justify-between"
                           >
-                            <span className="text-purple-400 font-medium">
+                            <span className="text-[#014BAA] dark:text-cyan-400 font-semibold">
                               {rel.relationship_type.replace(/_/g, " ")}
                             </span>
-                            <span className="text-white font-semibold flex items-center gap-1">
-                              <ArrowRight className="h-3 w-3 text-slate-500" />
+                            <span className="text-[#282B4A] dark:text-white font-medium flex items-center gap-1">
+                              <ArrowRight className="h-3 w-3 text-slate-400" />
                               {targetNode?.name || "Target"}
                             </span>
                           </div>
@@ -854,13 +859,13 @@ export default function KnowledgeGraphPage() {
                         return (
                           <div
                             key={rel.id}
-                            className="p-2 rounded-lg bg-slate-950/50 border border-slate-800/80 text-xs flex items-center justify-between"
+                            className="p-2 rounded-lg bg-[#F8F3F0] dark:bg-navy-950/50 border border-[#EEEBDA] dark:border-navy-800/80 text-xs flex items-center justify-between"
                           >
-                            <span className="text-slate-300 font-semibold flex items-center gap-1">
+                            <span className="text-[#282B4A] dark:text-slate-300 font-medium flex items-center gap-1">
                               {sourceNode?.name || "Source"}
-                              <ArrowRight className="h-3 w-3 text-slate-500" />
+                              <ArrowRight className="h-3 w-3 text-slate-400" />
                             </span>
-                            <span className="text-blue-400 font-medium">
+                            <span className="text-[#014BAA] dark:text-blue-400 font-semibold">
                               {rel.relationship_type.replace(/_/g, " ")}
                             </span>
                           </div>
@@ -871,10 +876,10 @@ export default function KnowledgeGraphPage() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-slate-800">
+              <div className="pt-3 border-t border-[#EEEBDA] dark:border-navy-800">
                 <button
                   onClick={() => handleDeleteEntity(selectedNode.id)}
-                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-medium rounded-lg text-rose-400 bg-rose-500/10 border border-rose-500/20 hover:bg-rose-500/20 transition-all"
+                  className="w-full flex items-center justify-center gap-2 px-3 py-2 text-xs font-semibold rounded-lg text-rose-600 bg-rose-50 border border-rose-200 hover:bg-rose-100 dark:text-rose-400 dark:bg-rose-500/10 dark:border-rose-500/20 dark:hover:bg-rose-500/20 transition-all"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
                   Delete Entity
@@ -887,16 +892,16 @@ export default function KnowledgeGraphPage() {
 
       {/* MODAL: New Entity */}
       {isCreateEntityOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Plus className="h-5 w-5 text-purple-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-navy-900 border border-[#EEEBDA] dark:border-navy-800 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EEEBDA] dark:border-navy-800">
+              <h3 className="text-lg font-bold text-[#282B4A] dark:text-white flex items-center gap-2">
+                <Plus className="h-5 w-5 text-[#014BAA]" />
                 Add Knowledge Entity
               </h3>
               <button
                 onClick={() => setIsCreateEntityOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-[#282B4A] dark:hover:text-white transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -904,7 +909,7 @@ export default function KnowledgeGraphPage() {
 
             <form onSubmit={handleCreateEntity} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Entity Name *
                 </label>
                 <input
@@ -915,12 +920,12 @@ export default function KnowledgeGraphPage() {
                   onChange={(e) =>
                     setNewEntity({ ...newEntity, name: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Entity Type *
                 </label>
                 <select
@@ -928,7 +933,7 @@ export default function KnowledgeGraphPage() {
                   onChange={(e) =>
                     setNewEntity({ ...newEntity, entity_type: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA]"
                 >
                   {Object.entries(ENTITY_CONFIG).map(([key, cfg]) => (
                     <option key={key} value={key}>
@@ -939,7 +944,7 @@ export default function KnowledgeGraphPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Description
                 </label>
                 <textarea
@@ -949,7 +954,7 @@ export default function KnowledgeGraphPage() {
                   onChange={(e) =>
                     setNewEntity({ ...newEntity, description: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500 resize-none"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA] resize-none"
                 />
               </div>
 
@@ -957,14 +962,14 @@ export default function KnowledgeGraphPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateEntityOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-[#282B4A] dark:text-slate-400 dark:hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !newEntity.name.trim()}
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-[#014BAA] text-[#F8F3F0] hover:bg-[#014BAA]/90 disabled:opacity-50 transition-all shadow-md shadow-[#014BAA]/25"
                 >
                   {isSubmitting ? "Creating..." : "Create Entity"}
                 </button>
@@ -976,16 +981,16 @@ export default function KnowledgeGraphPage() {
 
       {/* MODAL: New Relationship */}
       {isCreateRelOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-md bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <GitFork className="h-5 w-5 text-blue-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-md bg-white dark:bg-navy-900 border border-[#EEEBDA] dark:border-navy-800 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EEEBDA] dark:border-navy-800">
+              <h3 className="text-lg font-bold text-[#282B4A] dark:text-white flex items-center gap-2">
+                <GitFork className="h-5 w-5 text-[#014BAA]" />
                 Add Connection Edge
               </h3>
               <button
                 onClick={() => setIsCreateRelOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-[#282B4A] dark:hover:text-white transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
@@ -993,7 +998,7 @@ export default function KnowledgeGraphPage() {
 
             <form onSubmit={handleCreateRelationship} className="mt-4 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Source Entity *
                 </label>
                 <select
@@ -1002,7 +1007,7 @@ export default function KnowledgeGraphPage() {
                   onChange={(e) =>
                     setNewRel({ ...newRel, source_entity_id: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA]"
                 >
                   <option value="">Select source entity...</option>
                   {nodes.map((n) => (
@@ -1014,7 +1019,7 @@ export default function KnowledgeGraphPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Relationship Type *
                 </label>
                 <input
@@ -1028,12 +1033,12 @@ export default function KnowledgeGraphPage() {
                       relationship_type: e.target.value,
                     })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA]"
                 />
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-slate-300 mb-1">
+                <label className="block text-xs font-semibold text-[#282B4A] dark:text-slate-300 mb-1">
                   Target Entity *
                 </label>
                 <select
@@ -1042,7 +1047,7 @@ export default function KnowledgeGraphPage() {
                   onChange={(e) =>
                     setNewRel({ ...newRel, target_entity_id: e.target.value })
                   }
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg px-3 py-2 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA]"
                 >
                   <option value="">Select target entity...</option>
                   {nodes
@@ -1059,7 +1064,7 @@ export default function KnowledgeGraphPage() {
                 <button
                   type="button"
                   onClick={() => setIsCreateRelOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-[#282B4A] dark:text-slate-400 dark:hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
@@ -1070,7 +1075,7 @@ export default function KnowledgeGraphPage() {
                     !newRel.source_entity_id ||
                     !newRel.target_entity_id
                   }
-                  className="px-4 py-2 text-sm font-medium rounded-lg bg-blue-600 text-white hover:bg-blue-500 disabled:opacity-50"
+                  className="px-4 py-2 text-sm font-semibold rounded-xl bg-[#014BAA] text-[#F8F3F0] hover:bg-[#014BAA]/90 disabled:opacity-50 transition-all shadow-md shadow-[#014BAA]/25"
                 >
                   {isSubmitting ? "Connecting..." : "Add Connection"}
                 </button>
@@ -1082,23 +1087,23 @@ export default function KnowledgeGraphPage() {
 
       {/* MODAL: Extract from Text */}
       {isExtractOpen && (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-2xl">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-              <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-purple-400" />
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+          <div className="w-full max-w-lg bg-white dark:bg-navy-900 border border-[#EEEBDA] dark:border-navy-800 rounded-2xl p-6 shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between pb-3 border-b border-[#EEEBDA] dark:border-navy-800">
+              <h3 className="text-lg font-bold text-[#282B4A] dark:text-white flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-[#014BAA]" />
                 Extract Knowledge Graph from Text
               </h3>
               <button
                 onClick={() => setIsExtractOpen(false)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-[#282B4A] dark:hover:text-white transition-colors"
               >
                 <X className="h-5 w-5" />
               </button>
             </div>
 
             <form onSubmit={handleExtractGraph} className="mt-4 space-y-4">
-              <p className="text-xs text-slate-400">
+              <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed">
                 Paste any unstructured notes, meeting logs, or architectural descriptions. Our AI extractor detects technologies, projects, people, and their relationships automatically.
               </p>
 
@@ -1109,7 +1114,7 @@ export default function KnowledgeGraphPage() {
                   placeholder="e.g. AI-MemoryVerse uses FastAPI, Next.js, PostgreSQL, and Redis. Met with Alex to build the search engine. Project Orion depends on Celery..."
                   value={extractText}
                   onChange={(e) => setExtractText(e.target.value)}
-                  className="w-full bg-slate-950 border border-slate-800 rounded-lg p-3 text-sm text-white focus:outline-none focus:border-purple-500 resize-none font-mono"
+                  className="w-full bg-[#F8F3F0] dark:bg-navy-950 border border-[#EEEBDA] dark:border-navy-800 rounded-lg p-3 text-sm text-[#282B4A] dark:text-white focus:outline-none focus:border-[#014BAA] resize-none font-mono"
                 />
               </div>
 
@@ -1117,14 +1122,14 @@ export default function KnowledgeGraphPage() {
                 <button
                   type="button"
                   onClick={() => setIsExtractOpen(false)}
-                  className="px-4 py-2 text-sm text-slate-400 hover:text-white"
+                  className="px-4 py-2 text-sm text-slate-500 hover:text-[#282B4A] dark:text-slate-400 dark:hover:text-white transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
                   disabled={isSubmitting || !extractText.trim()}
-                  className="flex items-center gap-2 px-4 py-2 text-sm font-medium rounded-lg bg-purple-600 text-white hover:bg-purple-500 disabled:opacity-50"
+                  className="flex items-center gap-2 px-5 py-2 text-sm font-semibold rounded-xl bg-[#014BAA] text-[#F8F3F0] hover:bg-[#014BAA]/90 disabled:opacity-50 transition-all shadow-md shadow-[#014BAA]/25"
                 >
                   {isSubmitting ? (
                     <>
@@ -1146,4 +1151,3 @@ export default function KnowledgeGraphPage() {
     </div>
   );
 }
-

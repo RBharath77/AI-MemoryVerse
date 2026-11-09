@@ -126,10 +126,20 @@ async def test_subscription_cancellation(client: AsyncClient, auth_headers: dict
 
 
 @pytest.mark.asyncio
-async def test_admin_system_overview_and_telemetry(client: AsyncClient, auth_headers: dict):
-    response = await client.get(
+async def test_admin_system_overview_and_telemetry(
+    client: AsyncClient, admin_headers: dict, auth_headers: dict
+):
+    # Non-admin user must be rejected with 403 Forbidden (BFLA defense)
+    forbidden_res = await client.get(
         "/api/v1/admin/overview",
         headers=auth_headers,
+    )
+    assert forbidden_res.status_code == 403
+
+    # Superuser must succeed
+    response = await client.get(
+        "/api/v1/admin/overview",
+        headers=admin_headers,
     )
     assert response.status_code == 200
     data = response.json()

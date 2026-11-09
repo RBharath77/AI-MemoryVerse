@@ -2,27 +2,85 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --background: #070b14;
-  --foreground: #f8fafc;
-  --card: #0b1329;
-  --card-foreground: #f8fafc;
-  --popover: #0b1329;
-  --popover-foreground: #f8fafc;
-  --primary: #06b6d4;
-  --primary-foreground: #070b14;
-  --secondary: #14234d;
-  --secondary-foreground: #f8fafc;
-  --muted: #0f1b3b;
-  --muted-foreground: #94a3b8;
-  --accent: #1e336e;
-  --accent-foreground: #f8fafc;
+/* -------------------------------------------------------------------------- */
+/* Theme Definitions: Dark (Nocturne Indigo) & Light (Royal Blue + Vanilla)   */
+/* Colors: #014BAA (Royal Blue) | #F8F3F0 (Vanilla) | #282B4A | #EEEBDA      */
+/* -------------------------------------------------------------------------- */
+
+:root,
+html.dark {
+  color-scheme: dark;
+
+  /* Custom user palette CSS variables */
+  --mv-blue: #014BAA;
+  --mv-vanilla: #F8F3F0;
+  --mv-vanilla-cream: #EEEBDA;
+  --mv-indigo: #282B4A;
+
+  /* RGB channels for Tailwind opacity modifiers (Dark Theme) */
+  --mv-bg-950: 24 26 44;          /* Deepest canvas */
+  --mv-bg-900: 40 43 74;          /* #282B4A card/sidebar surface */
+  --mv-bg-850: 52 56 94;          /* Elevated surface */
+  --mv-border-800: 66 71 118;     /* Indigo border */
+  --mv-border-700: 88 94 154;     /* Interactive border */
+
+  --background: #181A2C;
+  --foreground: #F8F3F0;
+  --card: #282B4A;
+  --card-foreground: #F8F3F0;
+  --popover: #282B4A;
+  --popover-foreground: #F8F3F0;
+  --primary: #014BAA;
+  --primary-foreground: #FFFFFF;
+  --secondary: #34385C;
+  --secondary-foreground: #F8F3F0;
+  --muted: #34385C;
+  --muted-foreground: #A0A3BA;
+  --accent: #014BAA;
+  --accent-foreground: #FFFFFF;
   --destructive: #ef4444;
-  --destructive-foreground: #f8fafc;
-  --border: #1e336e;
-  --input: #14234d;
-  --ring: #06b6d4;
+  --destructive-foreground: #FFFFFF;
+  --border: #424776;
+  --input: #34385C;
+  --ring: #014BAA;
   --radius: 0.5rem;
+}
+
+html.light {
+  color-scheme: light;
+
+  /* Custom user palette CSS variables (Light Theme: Royal Blue & Vanilla) */
+  --mv-blue: #014BAA;
+  --mv-vanilla: #F8F3F0;
+  --mv-vanilla-cream: #EEEBDA;
+  --mv-indigo: #282B4A;
+
+  /* RGB channels for Tailwind opacity modifiers (Light Theme) */
+  --mv-bg-950: 248 243 240;       /* #F8F3F0 main vanilla canvas */
+  --mv-bg-900: 255 255 255;       /* Crisp white cards on vanilla */
+  --mv-bg-850: 238 235 218;       /* #EEEBDA warm vanilla cream surface */
+  --mv-border-800: 220 216 198;   /* Warm vanilla linen border */
+  --mv-border-700: 195 190 170;   /* Interactive border */
+
+  --background: #F8F3F0;          /* Warm Vanilla */
+  --foreground: #282B4A;          /* Deep Indigo Slate */
+  --card: #FFFFFF;
+  --card-foreground: #282B4A;
+  --popover: #FFFFFF;
+  --popover-foreground: #282B4A;
+  --primary: #014BAA;             /* Royal Blue */
+  --primary-foreground: #F8F3F0;  /* Vanilla text on Royal Blue */
+  --secondary: #EEEBDA;          /* Vanilla cream */
+  --secondary-foreground: #014BAA;
+  --muted: #EEEBDA;
+  --muted-foreground: #5A5D7A;
+  --accent: #014BAA;
+  --accent-foreground: #F8F3F0;
+  --destructive: #dc2626;
+  --destructive-foreground: #FFFFFF;
+  --border: #EEEBDA;
+  --input: #FFFFFF;
+  --ring: #014BAA;
 }
 
 body {
@@ -31,22 +89,146 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   overflow-x: hidden;
   min-height: 100vh;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
-/* Custom scrollbars */
+/* -------------------------------------------------------------------------- */
+/* Light Mode Typography & Color Pattern: Royal Blue (#014BAA) & Vanilla     */
+/* -------------------------------------------------------------------------- */
+html.light,
+html.light body {
+  background-color: #F8F3F0 !important;
+  color: #282B4A !important;
+}
+
+/* Page headings and labels in light mode: high-contrast dark indigo */
+html.light h1:not([class*="text-transparent"]):not([data-contrast="white"]),
+html.light h2:not([class*="text-transparent"]):not([data-contrast="white"]),
+html.light h3:not([class*="text-transparent"]):not([data-contrast="white"]),
+html.light h4:not([class*="text-transparent"]):not([data-contrast="white"]) {
+  color: #282B4A;
+}
+
+html.light .text-slate-100:not([class*="text-transparent"]),
+html.light .text-slate-200:not([class*="text-transparent"]) {
+  color: #282B4A !important;
+}
+
+html.light .text-slate-300:not([class*="text-transparent"]) {
+  color: #383C66 !important;
+}
+
+html.light .text-slate-400:not([class*="text-transparent"]) {
+  color: #5A5D7A !important;
+}
+
+html.light .text-slate-500:not([class*="text-transparent"]) {
+  color: #727696 !important;
+}
+
+/* Ensure solid dark/primary buttons preserve crisp vanilla text */
+html.light [data-contrast="white"],
+html.light .btn-solid-blue,
+html.light button.bg-mv-blue,
+html.light a.bg-mv-blue {
+  color: #F8F3F0 !important;
+}
+
+html.light [data-contrast="white"] *,
+html.light .btn-solid-blue *,
+html.light button.bg-mv-blue *,
+html.light a.bg-mv-blue * {
+  color: #F8F3F0 !important;
+}
+html.light [class*="bg-[#014BAA]/"] * {
+  color: inherit;
+}
+
+/* Ensure the Brain icon inside the Royal Blue Logo Box is always Vanilla (#F8F3F0) */
+.logo-icon-box,
+[data-logo-box="true"] {
+  background-color: #014BAA !important;
+}
+.logo-icon-box svg,
+[data-logo-box="true"] svg {
+  color: #F8F3F0 !important;
+  stroke: #F8F3F0 !important;
+}
+
+/* Primary actions: convert cyan-500 to Royal Blue #014BAA in light theme */
+html.light .bg-cyan-500 {
+  background-color: #014BAA !important;
+  color: #F8F3F0 !important;
+}
+html.light .hover\:bg-cyan-400:hover {
+  background-color: #013d8a !important;
+}
+
+/* Accent link and cyan text transforms into rich Royal Blue #014BAA */
+html.light .text-cyan-400 {
+  color: #014BAA !important;
+}
+html.light .bg-cyan-500\/10,
+html.light .bg-cyan-500\/15 {
+  background-color: rgba(1, 75, 170, 0.08) !important;
+}
+html.light .bg-cyan-500\/20 {
+  background-color: rgba(1, 75, 170, 0.14) !important;
+}
+html.light .border-cyan-500\/20,
+html.light .border-cyan-500\/30,
+html.light .border-cyan-500\/40,
+html.light .border-cyan-500\/50 {
+  border-color: rgba(1, 75, 170, 0.25) !important;
+}
+
+/* Light mode dark-square badge overrides (Total memories, MCP, Chat badges) */
+html.light .bg-cyan-950,
+html.light .bg-cyan-950\/80,
+html.light .bg-blue-950,
+html.light .bg-blue-950\/80 {
+  background-color: rgba(1, 75, 170, 0.08) !important;
+  border-color: rgba(1, 75, 170, 0.22) !important;
+}
+html.light .bg-amber-950,
+html.light .bg-amber-950\/80 {
+  background-color: rgba(245, 158, 11, 0.1) !important;
+  border-color: rgba(245, 158, 11, 0.25) !important;
+}
+html.light .bg-emerald-950,
+html.light .bg-emerald-950\/80 {
+  background-color: rgba(16, 185, 129, 0.1) !important;
+  border-color: rgba(16, 185, 129, 0.25) !important;
+}
+html.light .bg-violet-950,
+html.light .bg-violet-950\/80 {
+  background-color: rgba(1, 75, 170, 0.08) !important;
+  border-color: rgba(1, 75, 170, 0.22) !important;
+}
+
+/* Light mode form inputs */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light textarea,
+html.light select {
+  color: #282B4A;
+  background-color: #FFFFFF;
+  border-color: #EEEBDA;
+}
+
+/* Custom scrollbars adapted to active theme */
 ::-webkit-scrollbar {
   width: 6px;
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #070b14;
+  background: var(--background);
 }
 ::-webkit-scrollbar-thumb {
-  background: #1e336e;
+  background: var(--border);
   border-radius: 3px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3b82f6;
+  background: #014BAA;
 }
 
 /* -------------------------------------------------------------------------- */
@@ -74,12 +256,12 @@ body {
   0%, 100% {
     transform: scale(1);
     opacity: 0.9;
-    filter: drop-shadow(0 0 12px rgba(6, 182, 212, 0.6));
+    filter: drop-shadow(0 0 12px rgba(1, 75, 170, 0.6));
   }
   50% {
     transform: scale(1.08);
     opacity: 1;
-    filter: drop-shadow(0 0 24px rgba(139, 92, 246, 0.85));
+    filter: drop-shadow(0 0 24px rgba(40, 43, 74, 0.85));
   }
 }
 
@@ -123,12 +305,12 @@ body {
   background: linear-gradient(
     90deg,
     rgba(148, 163, 184, 0.5) 0%,
-    rgba(6, 182, 212, 1) 50%,
+    rgba(1, 75, 170, 1) 50%,
     rgba(148, 163, 184, 0.5) 100%
   );
   background-size: 200% 100%;
   -webkit-background-clip: text;
+  background-clip: text;
   -webkit-text-fill-color: transparent;
   animation: shimmer 3s ease-in-out infinite;
 }
-

@@ -1,9 +1,11 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_active_user, get_current_workspace, get_db
+from app.core.config import settings
 from app.models.user import User
-from app.models.workspace import Workspace
+from app.models.workspace import Workspace, WorkspaceMember, WorkspaceRole
 from app.schemas.billing import (
     PLAN_CATALOG,
     CheckoutRequest,
@@ -17,6 +19,26 @@ from app.services.billing_service import BillingService
 from app.services.payment_provider import get_payment_provider
 
 router = APIRouter()
+
+
+async def _assert_billing_admin(
+    db: AsyncSession,
+    workspace_id: str,
+    user: User,
+) -> None:
+    """Enforce that only workspace OWNER or ADMIN can perform financial/subscription operations."""
+    if user.is_superuser:
+        return
+    q = select(WorkspaceMember.role).where(
+        WorkspaceMember.workspace_id == workspace_id,
+        WorkspaceMember.user_id == user.id,
+    )
+    role = (await db.execute(q)).scalar_one_or_none()
+    if role not in (WorkspaceRole.OWNER, WorkspaceRole.ADMIN):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Billing and subscription operations require workspace Admin or Owner permissions.",
+        )
 
 
 @router.get("/plans", response_model=APIResponse[list[PlanInfo]])
@@ -54,6 +76,7 @@ async def create_checkout_session(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[CheckoutResponse]:
     """Initialize a payment checkout session for plan upgrade."""
+    await _assert_billing_admin(db, workspace.id, current_user)
     provider = get_payment_provider()
     session_data = await provider.create_checkout_session(
         workspace_id=workspace.id,
@@ -78,6 +101,13 @@ async def upgrade_plan_direct(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[SubscriptionResponse]:
     """Instantly apply plan upgrade (supported in sandbox mode and verified payments)."""
+    await _assert_billing_admin(db, workspace.id, current_user)
+    if settings.PAYMENT_PROVIDER != "sandbox" and not current_user.is_superuser:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Direct plan upgrades are restricted to sandbox environments. Please complete payment via /checkout.",
+        )
+
     updated_sub = await BillingService.upgrade_plan(
         db=db,
         workspace_id=workspace.id,
@@ -94,6 +124,7 @@ async def cancel_subscription(
     db: AsyncSession = Depends(get_db),
 ) -> APIResponse[SubscriptionResponse]:
     """Schedule current subscription to cancel at the end of the billing period."""
+    await _assert_billing_admin(db, workspace.id, current_user)
     updated_sub = await BillingService.cancel_subscription(
         db=db,
         workspace_id=workspace.id,

@@ -5,17 +5,19 @@ Revises: 0006_research_and_insights
 Create Date: 2026-11-05 16:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "0007_agents_and_integrations"
-down_revision: Union[str, None] = "0006_research_and_insights"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0006_research_and_insights"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -84,7 +86,9 @@ def upgrade() -> None:
             nullable=True,
         ),
         sa.Column("risk_level", sa.String(length=16), nullable=False, server_default="low"),
-        sa.Column("approval_status", sa.String(length=32), nullable=False, server_default="approved_auto"),
+        sa.Column(
+            "approval_status", sa.String(length=32), nullable=False, server_default="approved_auto"
+        ),
         sa.Column("execution_latency_ms", sa.Float(), nullable=True),
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
@@ -134,4 +138,3 @@ def downgrade() -> None:
     op.drop_table("api_tokens")
     op.drop_table("agent_actions")
     op.drop_table("agent_tasks")
-

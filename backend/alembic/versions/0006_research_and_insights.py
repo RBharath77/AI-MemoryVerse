@@ -5,17 +5,19 @@ Revises: 0005_knowledge_graph
 Create Date: 2026-11-05 15:00:00.000000
 
 """
-from typing import Sequence, Union
 
-from alembic import op
+from collections.abc import Sequence
+
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
+from alembic import op
+
 # revision identifiers, used by Alembic.
 revision: str = "0006_research_and_insights"
-down_revision: Union[str, None] = "0005_knowledge_graph"
-branch_labels: Union[str, Sequence[str], None] = None
-depends_on: Union[str, Sequence[str], None] = None
+down_revision: str | None = "0005_knowledge_graph"
+branch_labels: str | Sequence[str] | None = None
+depends_on: str | Sequence[str] | None = None
 
 
 def upgrade() -> None:
@@ -37,7 +39,9 @@ def upgrade() -> None:
         ),
         sa.Column("title", sa.String(length=255), nullable=False),
         sa.Column("topic", sa.String(length=255), nullable=False),
-        sa.Column("report_type", sa.String(length=32), nullable=False, server_default="topic_research"),
+        sa.Column(
+            "report_type", sa.String(length=32), nullable=False, server_default="topic_research"
+        ),
         sa.Column("status", sa.String(length=32), nullable=False, server_default="completed"),
         sa.Column("content_markdown", sa.Text(), nullable=False),
         sa.Column(
@@ -103,12 +107,17 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
-    op.create_index(op.f("ix_knowledge_insights_workspace_id"), "knowledge_insights", ["workspace_id"])
-    op.create_index(op.f("ix_knowledge_insights_insight_type"), "knowledge_insights", ["insight_type"])
-    op.create_index(op.f("ix_knowledge_insights_is_dismissed"), "knowledge_insights", ["is_dismissed"])
+    op.create_index(
+        op.f("ix_knowledge_insights_workspace_id"), "knowledge_insights", ["workspace_id"]
+    )
+    op.create_index(
+        op.f("ix_knowledge_insights_insight_type"), "knowledge_insights", ["insight_type"]
+    )
+    op.create_index(
+        op.f("ix_knowledge_insights_is_dismissed"), "knowledge_insights", ["is_dismissed"]
+    )
 
 
 def downgrade() -> None:
     op.drop_table("knowledge_insights")
     op.drop_table("research_reports")
-

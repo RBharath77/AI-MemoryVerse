@@ -87,3 +87,41 @@ class APITokenResponse(BaseModel):
     created_at: datetime
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class IntentRuleViolation(BaseModel):
+    rule_name: str
+    severity: str  # "LOW", "MEDIUM", "HIGH", "CRITICAL"
+    description: str
+    matched_pattern: str | None = None
+
+
+class IntentInspectionRequest(BaseModel):
+    prompt: str = Field(
+        ..., min_length=1, max_length=10000, description="Agent prompt or directive to evaluate"
+    )
+    tool_name: str | None = Field(
+        default=None, description="Optional target tool name planned for invocation"
+    )
+    tool_args: dict[str, Any] = Field(default_factory=dict, description="Target tool parameters")
+    mode: str = Field(
+        default="ENFORCE",
+        pattern=r"^(ENFORCE|AUDIT)$",
+        description="'ENFORCE' blocks execution, 'AUDIT' logs warnings",
+    )
+    risk_threshold: float = Field(
+        default=0.60,
+        ge=0.1,
+        le=0.99,
+        description="Risk score threshold above which intent is blocked",
+    )
+
+
+class IntentInspectionResponse(BaseModel):
+    workspace_id: str
+    safety_class: str  # "BENIGN", "SUSPICIOUS", "EXFILTRATION_ATTEMPT", "PRIVILEGE_ESCALATION", "DESTRUCTIVE_MUTATION"
+    risk_score: float = Field(ge=0.0, le=1.0)
+    is_allowed: bool
+    violations: list[IntentRuleViolation] = Field(default_factory=list)
+    mitigation_action: str  # "ALLOW", "QUARANTINE_BLOCKED", "LOGGED_AUDIT_WARNING"
+    inspected_at: datetime

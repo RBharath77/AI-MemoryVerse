@@ -223,3 +223,87 @@ async def test_unsupported_file_type_rejection(client: AsyncClient, auth_headers
     res = await client.post("/api/v1/documents/upload", files=files, headers=auth_headers)
     assert res.status_code == 400
     assert "Unsupported file format" in res.json()["error"]["message"]
+
+
+@pytest.mark.asyncio
+async def test_download_document_and_raw_stream(client: AsyncClient, auth_headers: dict):
+    """Phase 2: Verify streaming document download routes."""
+    test_content = "This is a confidential architecture diagram and documentation text."
+    files = {
+        "file": (
+            "architecture_spec.txt",
+            io.BytesIO(test_content.encode("utf-8")),
+            "text/plain",
+        )
+    }
+    upload_res = await client.post("/api/v1/documents/upload", files=files, headers=auth_headers)
+    assert upload_res.status_code == 201
+    doc_id = upload_res.json()["data"]["document"]["id"]
+
+    # 1. Get download URL
+    url_res = await client.get(f"/api/v1/documents/{doc_id}/download", headers=auth_headers)
+    assert url_res.status_code == 200
+    download_url = url_res.json()["data"]["download_url"]
+    assert "download-file?key=" in download_url
+
+    # 2. Execute download via key endpoint
+    dl_res = await client.get(download_url, headers=auth_headers)
+    assert dl_res.status_code == 200
+    assert dl_res.text == test_content
+    assert "architecture_spec.txt" in dl_res.headers.get("content-disposition", "")
+
+    # 3. Direct raw download endpoint
+    raw_res = await client.get(f"/api/v1/documents/{doc_id}/raw", headers=auth_headers)
+    assert raw_res.status_code == 200
+    assert raw_res.text == test_content
+
+
+@pytest.mark.asyncio
+async def test_download_document_tenant_isolation_and_path_traversal(
+    client: AsyncClient, auth_headers: dict
+):
+    """Phase 2: Cross-tenant download and path traversal attempts must be rejected."""
+    # Upload document in tenant A
+    files = {
+        "file": (
+            "private_report.txt",
+            io.BytesIO(b"Tenant A Private Report"),
+            "text/plain",
+        )
+    }
+    upload_res = await client.post("/api/v1/documents/upload", files=files, headers=auth_headers)
+    doc_id = upload_res.json()["data"]["document"]["id"]
+
+    url_res = await client.get(f"/api/v1/documents/{doc_id}/download", headers=auth_headers)
+    download_url = url_res.json()["data"]["download_url"]
+
+    # Register tenant B
+    reg_b = await client.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "intruder@memoryverse.ai",
+            "password": "Password123!",
+            "full_name": "Intruder User",
+        },
+    )
+    token_b = reg_b.json()["data"]["tokens"]["access_token"]
+    ws_b = reg_b.json()["data"]["workspace"]["id"]
+    headers_b = {
+        "Authorization": f"Bearer {token_b}",
+        "X-Workspace-ID": ws_b,
+    }
+
+    # Tenant B attempts to download Tenant A's document via key
+    cross_dl = await client.get(download_url, headers=headers_b)
+    assert cross_dl.status_code == 404
+
+    # Tenant B attempts to download Tenant A's document via raw ID
+    cross_raw = await client.get(f"/api/v1/documents/{doc_id}/raw", headers=headers_b)
+    assert cross_raw.status_code == 404
+
+    # Path traversal attack attempt
+    traversal_res = await client.get(
+        "/api/v1/documents/download-file?key=../../../../etc/passwd",
+        headers=auth_headers,
+    )
+    assert traversal_res.status_code == 404

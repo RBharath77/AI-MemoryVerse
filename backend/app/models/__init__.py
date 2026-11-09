@@ -50,6 +50,10 @@ from app.models.user import (
     UserSession,
     UserVerificationToken,
 )
+from app.models.webhook import (
+    WebhookDelivery,
+    WebhookEndpoint,
+)
 from app.models.workspace import (
     Workspace,
     WorkspaceMember,
@@ -98,4 +102,6 @@ __all__ = [
     "SubscriptionStatus",
     "Invoice",
     "AuditEvent",
+    "WebhookEndpoint",
+    "WebhookDelivery",
 ]

@@ -4,6 +4,7 @@ import os
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
+from sqlalchemy.pool import StaticPool
 
 # Set test environment variables before importing app
 os.environ["APP_ENV"] = "test"
@@ -11,14 +12,18 @@ os.environ["SECRET_KEY"] = "test-secret-key-at-least-32-characters-long"
 os.environ["DATABASE_URL"] = "sqlite+aiosqlite:///:memory:"
 os.environ["LLM_PROVIDER"] = "mock"
 os.environ["EMBEDDING_PROVIDER"] = "mock"
+os.environ["RATE_LIMIT_ENABLED"] = "false"
 
+import app.models  # noqa: F401
+from app.core import database as core_db
 from app.core.database import Base, get_db
 from app.main import app
 
-# Create in-memory SQLite async engine
+# Create in-memory SQLite async engine with StaticPool
 test_engine = create_async_engine(
     "sqlite+aiosqlite:///:memory:",
     echo=False,
+    poolclass=StaticPool,
     connect_args={"check_same_thread": False},
 )
 
@@ -29,6 +34,9 @@ TestSessionLocal = async_sessionmaker(
     autocommit=False,
     autoflush=False,
 )
+
+core_db.async_session_factory = TestSessionLocal
+core_db.AsyncSessionLocal = TestSessionLocal
 
 
 @pytest_asyncio.fixture(scope="session")
@@ -84,6 +92,36 @@ async def auth_headers(client: AsyncClient):
     data = resp.json()["data"]
     token = data["tokens"]["access_token"]
     workspace_id = data["workspace"]["id"]
+    return {
+        "Authorization": f"Bearer {token}",
+        "X-Workspace-ID": workspace_id,
+    }
+
+
+@pytest_asyncio.fixture
+async def admin_headers(client: AsyncClient):
+    """Fixture that registers a superuser and returns Authorization headers."""
+    register_payload = {
+        "email": "admin@memoryverse.ai",
+        "password": "Password123!",
+        "full_name": "Super Admin",
+        "workspace_name": "Admin Workspace",
+    }
+    resp = await client.post("/api/v1/auth/register", json=register_payload)
+    assert resp.status_code == 201
+    data = resp.json()["data"]
+    token = data["tokens"]["access_token"]
+    workspace_id = data["workspace"]["id"]
+    user_id = data["user"]["id"]
+
+    from app.models.user import User
+
+    async with TestSessionLocal() as session:
+        user = await session.get(User, user_id)
+        if user:
+            user.is_superuser = True
+            await session.commit()
+
     return {
         "Authorization": f"Bearer {token}",
         "X-Workspace-ID": workspace_id,

@@ -1,6 +1,8 @@
 import hashlib
 import logging
+import re
 import uuid
+from pathlib import Path
 
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import desc, func, or_, select
@@ -9,8 +11,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ai.chunker import DocumentChunker
 from app.ai.document_parser import DocumentParser
 from app.ai.factory import get_embedding_provider
+from app.core.config import settings
 from app.core.storage import get_storage_provider
 from app.models.document import Document, DocumentChunk, DocumentStatus
+from app.models.workspace import Workspace
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +31,10 @@ class DocumentService:
         file: UploadFile,
         title: str | None = None,
     ) -> Document:
-        filename = file.filename or "untitled_document"
+        raw_filename = file.filename or "untitled_document"
+        clean_name = re.sub(r"[^\w\.\-\_ ]", "_", Path(raw_filename).name).strip()
+        filename = clean_name if clean_name else "document.txt"
+
         ext = filename.lower().split(".")[-1] if "." in filename else ""
         if ext not in ALLOWED_EXTENSIONS:
             supported = ", ".join(sorted(ALLOWED_EXTENSIONS))
@@ -43,6 +50,55 @@ class DocumentService:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"File exceeds maximum size of 25MB ({file_size / (1024 * 1024):.2f}MB).",
+            )
+
+        # Executable binary signatures check
+        if (
+            file_bytes.startswith(b"MZ")  # Windows PE/EXE/DLL
+            or file_bytes.startswith(b"\x7fELF")  # Linux ELF
+            or file_bytes.startswith(b"\xfe\xed\xfa\xce")  # Mach-O 32-bit
+            or file_bytes.startswith(b"\xfe\xed\xfa\xcf")  # Mach-O 64-bit
+            or file_bytes.startswith(b"\xce\xfa\xed\xfe")  # Mach-O reverse
+            or file_bytes.startswith(b"\xcf\xfa\xed\xfe")  # Mach-O 64 reverse
+            or file_bytes.startswith(b"\x00asm")  # WebAssembly bytecode
+            or file_bytes.startswith(b"\xca\xfe\xba\xbe")  # Java / Universal binary
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Executable binary and compiled bytecode files are strictly prohibited.",
+            )
+
+        # PDF header validation
+        if ext == "pdf":
+            # PDF specifications require %PDF- to appear within the first 1024 bytes
+            header_sample = file_bytes[:1024]
+            if b"%PDF-" not in header_sample:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Corrupted or invalid PDF header.",
+                )
+
+        # Enforce aggregate workspace storage quota
+        total_storage_query = select(func.coalesce(func.sum(Document.file_size), 0)).where(
+            Document.workspace_id == workspace_id
+        )
+        current_used_bytes = (await db.execute(total_storage_query)).scalar() or 0
+
+        workspace = await db.get(Workspace, workspace_id)
+        plan_tier = workspace.plan_tier.lower() if workspace and workspace.plan_tier else "free"
+        max_quota = settings.STORAGE_QUOTA_BYTES_BY_TIER.get(
+            plan_tier, settings.STORAGE_QUOTA_BYTES_BY_TIER["free"]
+        )
+
+        if current_used_bytes + file_size > max_quota:
+            used_mb = current_used_bytes / (1024 * 1024)
+            quota_mb = max_quota / (1024 * 1024)
+            raise HTTPException(
+                status_code=status.HTTP_402_PAYMENT_REQUIRED,
+                detail=(
+                    f"Workspace storage quota exceeded: {used_mb:.1f} MB used of {quota_mb:.0f} MB "
+                    f"allocated for the '{plan_tier.capitalize()}' tier. Please upgrade your plan."
+                ),
             )
 
         file_hash = hashlib.sha256(file_bytes).hexdigest()
@@ -72,9 +128,22 @@ class DocumentService:
         await db.commit()
         await db.refresh(doc)
 
-        # Execute extraction and chunking pipeline
-        await DocumentService.process_document(db, doc.id)
-        await db.refresh(doc)
+        # Execute extraction and chunking pipeline (Offload to Celery worker if available)
+        dispatched_to_worker = False
+        if settings.APP_ENV != "test":
+            try:
+                from app.workers.tasks import process_document_task
+
+                process_document_task.delay(str(doc.id))
+                dispatched_to_worker = True
+            except Exception as e:
+                logger.warning(
+                    f"Celery dispatch unavailable ({e}); executing synchronous extraction."
+                )
+
+        if not dispatched_to_worker:
+            await DocumentService.process_document(db, doc.id)
+            await db.refresh(doc)
         return doc
 
     @staticmethod
@@ -150,6 +219,9 @@ class DocumentService:
             doc.error_message = None
             await db.commit()
             await db.refresh(doc)
+            from app.ai.semantic_cache import SemanticCache
+
+            SemanticCache.invalidate_workspace(doc.workspace_id)
             return doc
 
         except Exception as e:
@@ -223,12 +295,22 @@ class DocumentService:
         db: AsyncSession,
         workspace_id: str,
         document_id: str,
+        current_user_id: str | None = None,
+        is_admin_or_owner: bool = False,
     ) -> bool:
         doc = await DocumentService.get_document(db, workspace_id, document_id)
+        if current_user_id and doc.user_id != current_user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to delete this document.",
+            )
         storage = get_storage_provider()
         await storage.delete_file(doc.file_key)
         await db.delete(doc)
         await db.commit()
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
         return True
 
     @staticmethod

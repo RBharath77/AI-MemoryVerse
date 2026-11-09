@@ -8,6 +8,7 @@ from typing import Any
 from fastapi import HTTPException, status
 from sqlalchemy import String, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm.attributes import flag_modified
 
 from app.ai.conflict_detector import ConflictDetector
 from app.ai.factory import get_embedding_provider
@@ -22,6 +23,8 @@ from app.models.memory import (
     MemoryVersion,
 )
 from app.schemas.memory import (
+    MemoryAutoConsolidateRequest,
+    MemoryConflictResolutionRequest,
     MemoryConsolidateRequest,
     MemoryCreate,
     MemoryExtractionRequest,
@@ -45,6 +48,23 @@ class MemoryService:
         user_id: str,
         data: MemoryCreate,
     ) -> Memory:
+        # 0. Enforce Workspace DLP Policy
+        from app.core.dlp import WorkspaceDLPService
+        from app.models.workspace import Workspace
+
+        ws_res = await db.execute(select(Workspace.settings).where(Workspace.id == workspace_id))
+        ws_settings = ws_res.scalar_one_or_none()
+        if ws_settings and isinstance(ws_settings, dict):
+            dlp_cfg = ws_settings.get("dlp_policy")
+            if dlp_cfg and dlp_cfg.get("enabled"):
+                dlp_res = WorkspaceDLPService.inspect(data.content, dlp_cfg)
+                if dlp_res.blocked:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail=f"DLP Policy Violation: Memory ingestion blocked due to detected {dlp_res.violations}",
+                    )
+                data.content = dlp_res.sanitized_text
+
         # 1. Fetch active workspace memories for duplicate and contradiction check
         existing_res = await db.execute(
             select(Memory.id, Memory.content, Memory.category).where(
@@ -109,6 +129,20 @@ class MemoryService:
         db.add(memory)
         await db.flush()
 
+        # Generate cryptographic integrity signature & initialize access tracking
+        now_dt = datetime.now(UTC)
+        meta["integrity_signature"] = MemoryService.compute_integrity_signature(
+            workspace_id=workspace_id,
+            memory_id=memory.id,
+            content=memory.content,
+            category=memory.category.value,
+            importance=memory.importance,
+        )
+        meta["access_count"] = 1
+        meta["last_accessed_at"] = now_dt.isoformat()
+        memory.extra_metadata = dict(meta)
+        flag_modified(memory, "extra_metadata")
+
         # Create initial version
         version = MemoryVersion(
             memory_id=memory.id,
@@ -133,6 +167,9 @@ class MemoryService:
 
         await db.commit()
         await db.refresh(memory)
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
         return memory
 
     @staticmethod
@@ -196,15 +233,19 @@ class MemoryService:
                 meta["conflicting_memory_id"] = conflict.conflicting_memory_id
                 meta["conflict_explanation"] = conflict.explanation
 
+            from app.core.sanitizer import CredentialSanitizer
+
+            clean_fact_content = CredentialSanitizer.redact(fact.content).sanitized_text
+
             try:
-                emb = await embedder.get_embedding(fact.content)
+                emb = await embedder.get_embedding(clean_fact_content)
             except Exception:
                 emb = None
 
             mem = Memory(
                 workspace_id=workspace_id,
                 user_id=user_id,
-                content=fact.content,
+                content=clean_fact_content,
                 category=category_enum,
                 status=mem_status,
                 importance=fact.importance,
@@ -217,6 +258,21 @@ class MemoryService:
             )
             db.add(mem)
             await db.flush()
+
+            now_dt = datetime.now(UTC)
+            meta = dict(mem.extra_metadata or {})
+            meta["integrity_signature"] = MemoryService.compute_integrity_signature(
+                workspace_id=workspace_id,
+                memory_id=mem.id,
+                content=mem.content,
+                category=mem.category.value
+                if hasattr(mem.category, "value")
+                else str(mem.category),
+                importance=mem.importance,
+            )
+            meta["access_count"] = 1
+            meta["last_accessed_at"] = now_dt.isoformat()
+            mem.extra_metadata = meta
 
             v = MemoryVersion(
                 memory_id=mem.id,
@@ -252,6 +308,9 @@ class MemoryService:
         await db.commit()
         for m in stored_memories:
             await db.refresh(m)
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
 
         return MemoryExtractionResponse(
             extracted_count=len(facts),
@@ -358,8 +417,14 @@ class MemoryService:
         memory_id: str,
         user_id: str,
         data: MemoryUpdate,
+        is_admin_or_owner: bool = False,
     ) -> Memory:
         memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        if memory.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to update this memory.",
+            )
 
         content_changed = data.content is not None and data.content != memory.content
 
@@ -401,8 +466,25 @@ class MemoryService:
         if data.extra_metadata is not None:
             memory.extra_metadata = data.extra_metadata
 
+        # Re-compute cryptographic integrity signature upon modification
+        meta = dict(memory.extra_metadata or {})
+        meta["integrity_signature"] = MemoryService.compute_integrity_signature(
+            workspace_id=workspace_id,
+            memory_id=memory.id,
+            content=memory.content,
+            category=memory.category.value
+            if hasattr(memory.category, "value")
+            else str(memory.category),
+            importance=memory.importance,
+        )
+        memory.extra_metadata = meta
+        flag_modified(memory, "extra_metadata")
+
         await db.commit()
         await db.refresh(memory)
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
         return memory
 
     @staticmethod
@@ -410,10 +492,20 @@ class MemoryService:
         db: AsyncSession,
         workspace_id: str,
         memory_id: str,
+        current_user_id: str | None = None,
+        is_admin_or_owner: bool = False,
     ) -> bool:
         memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        if current_user_id and memory.user_id != current_user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to delete this memory.",
+            )
         await db.delete(memory)
         await db.commit()
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
         return True
 
     @staticmethod
@@ -440,8 +532,14 @@ class MemoryService:
         memory_id: str,
         user_id: str,
         version_number: int,
+        is_admin_or_owner: bool = False,
     ) -> Memory:
         memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        if memory.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to restore this memory.",
+            )
 
         v_query = select(MemoryVersion).where(
             MemoryVersion.memory_id == memory_id,
@@ -483,6 +581,9 @@ class MemoryService:
         db.add(new_v)
         await db.commit()
         await db.refresh(memory)
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
         return memory
 
     @staticmethod
@@ -517,6 +618,7 @@ class MemoryService:
         review_id: str,
         user_id: str,
         action: MemoryReviewAction,
+        is_admin_or_owner: bool = False,
     ) -> MemoryReview:
         query = select(MemoryReview).where(
             MemoryReview.id == review_id,
@@ -531,10 +633,16 @@ class MemoryService:
             )
 
         memory = await db.get(Memory, review.memory_id)
-        if not memory:
+        if not memory or memory.workspace_id != workspace_id:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Associated memory not found.",
+                detail="Associated memory not found or unauthorized.",
+            )
+
+        if memory.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to review this memory.",
             )
 
         act = action.review_status.lower()
@@ -552,9 +660,12 @@ class MemoryService:
             memory.status = MemoryStatus.REJECTED
         elif act == "corrected":
             review.review_status = "corrected"
-            review.corrected_text = action.corrected_text
             if action.corrected_text:
-                memory.content = action.corrected_text
+                from app.core.sanitizer import CredentialSanitizer
+
+                clean_text = CredentialSanitizer.redact(action.corrected_text).sanitized_text
+                review.corrected_text = clean_text
+                memory.content = clean_text
                 # Log version
                 latest_res = await db.execute(
                     select(func.max(MemoryVersion.version_number)).where(
@@ -565,12 +676,14 @@ class MemoryService:
                 v = MemoryVersion(
                     memory_id=memory.id,
                     version_number=max_v + 1,
-                    content=action.corrected_text,
+                    content=clean_text,
                     category=memory.category.value,
                     changed_by_user_id=user_id,
                     change_reason="User corrected during review",
                 )
                 db.add(v)
+            else:
+                review.corrected_text = None
             memory.status = MemoryStatus.APPROVED
         else:
             raise HTTPException(
@@ -758,8 +871,11 @@ class MemoryService:
         imported = 0
         skipped = 0
 
+        from app.core.sanitizer import CredentialSanitizer
+
         for item in items:
-            dup = ConflictDetector.check_duplicate(item.content, existing_rows)
+            clean_content = CredentialSanitizer.redact(item.content).sanitized_text
+            dup = ConflictDetector.check_duplicate(clean_content, existing_rows)
             if dup.is_duplicate and dup.similarity_score >= 0.90:
                 skipped += 1
                 continue
@@ -767,7 +883,7 @@ class MemoryService:
             mem = Memory(
                 workspace_id=workspace_id,
                 user_id=user_id,
-                content=item.content,
+                content=clean_content,
                 category=item.category,
                 status=MemoryStatus.APPROVED,
                 importance=item.importance,
@@ -777,6 +893,21 @@ class MemoryService:
             )
             db.add(mem)
             await db.flush()
+
+            now_dt = datetime.now(UTC)
+            meta = dict(mem.extra_metadata or {})
+            meta["integrity_signature"] = MemoryService.compute_integrity_signature(
+                workspace_id=workspace_id,
+                memory_id=mem.id,
+                content=mem.content,
+                category=mem.category.value
+                if hasattr(mem.category, "value")
+                else str(mem.category),
+                importance=mem.importance,
+            )
+            meta["access_count"] = 1
+            meta["last_accessed_at"] = now_dt.isoformat()
+            mem.extra_metadata = meta
 
             v = MemoryVersion(
                 memory_id=mem.id,
@@ -800,9 +931,26 @@ class MemoryService:
         source_memory_id: str,
         data: MemoryLinkCreate,
     ) -> MemoryLink:
+        if source_memory_id == data.target_memory_id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Source and target memories cannot be the same.",
+            )
+
         # Tenancy verification for both source and target memories
         src = await MemoryService.get_memory(db, workspace_id, source_memory_id)
         target = await MemoryService.get_memory(db, workspace_id, data.target_memory_id)
+
+        # Idempotency check for identical relationship
+        existing_q = select(MemoryLink).where(
+            MemoryLink.workspace_id == workspace_id,
+            MemoryLink.source_memory_id == src.id,
+            MemoryLink.target_memory_id == target.id,
+            MemoryLink.relationship_type == data.relationship_type,
+        )
+        existing = (await db.execute(existing_q)).scalar_one_or_none()
+        if existing:
+            return existing
 
         link = MemoryLink(
             workspace_id=workspace_id,
@@ -888,3 +1036,649 @@ class MemoryService:
             "by_category": dict(by_cat),
             "top_tags": top_tags,
         }
+
+    @staticmethod
+    def _calculate_similarity(m1: Memory, m2: Memory) -> float:
+        # 1. Exact or normalized string match
+        c1 = m1.content.strip().lower()
+        c2 = m2.content.strip().lower()
+        if c1 == c2:
+            return 1.0
+
+        # 2. Token-based Jaccard similarity
+        import re
+
+        tokens1 = set(re.findall(r"\w+", c1))
+        tokens2 = set(re.findall(r"\w+", c2))
+        token_sim = 0.0
+        if tokens1 and tokens2:
+            intersection = len(tokens1 & tokens2)
+            union = len(tokens1 | tokens2)
+            token_sim = (intersection / union) if union > 0 else 0.0
+
+        # 3. Vector cosine similarity if both embeddings present
+        vec_sim = 0.0
+        if m1.embedding and m2.embedding and len(m1.embedding) == len(m2.embedding):
+            import math
+
+            dot = sum(a * b for a, b in zip(m1.embedding, m2.embedding))
+            norm_a = math.sqrt(sum(a * a for a in m1.embedding))
+            norm_b = math.sqrt(sum(b * b for b in m2.embedding))
+            if norm_a > 0 and norm_b > 0:
+                cos_sim = dot / (norm_a * norm_b)
+                vec_sim = max(0.0, min(1.0, float(cos_sim)))
+
+        return max(token_sim, vec_sim)
+
+    @staticmethod
+    async def deduplicate_workspace_memories(
+        db: AsyncSession,
+        workspace_id: str,
+        user_id: str,
+        similarity_threshold: float = 0.90,
+        auto_merge: bool = True,
+    ) -> dict[str, Any]:
+        from app.ai.semantic_cache import SemanticCache
+
+        # Query all active approved memories in workspace, ordered by created_at ascending
+        query = (
+            select(Memory)
+            .where(
+                Memory.workspace_id == workspace_id,
+                Memory.status == MemoryStatus.APPROVED,
+            )
+            .order_by(Memory.created_at.asc())
+        )
+        res = await db.execute(query)
+        memories = list(res.scalars().all())
+
+        scanned_count = len(memories)
+        duplicates_found = 0
+        consolidated_count = 0
+        details = []
+
+        superseded_set = set()
+
+        for i in range(len(memories)):
+            m_primary = memories[i]
+            if m_primary.id in superseded_set:
+                continue
+
+            for j in range(i + 1, len(memories)):
+                m_duplicate = memories[j]
+                if m_duplicate.id in superseded_set:
+                    continue
+
+                sim = MemoryService._calculate_similarity(m_primary, m_duplicate)
+                if sim >= similarity_threshold:
+                    duplicates_found += 1
+                    superseded_set.add(m_duplicate.id)
+
+                    details.append(
+                        {
+                            "primary_id": m_primary.id,
+                            "duplicate_id": m_duplicate.id,
+                            "similarity": round(float(sim), 4),
+                            "action": "superseded" if auto_merge else "flagged",
+                        }
+                    )
+
+                    if auto_merge:
+                        m_duplicate.status = MemoryStatus.SUPERSEDED
+                        m_duplicate.superseded_by = m_primary.id
+
+                        # Merge tags into primary
+                        primary_tags = list(m_primary.tags or [])
+                        dup_tags = list(m_duplicate.tags or [])
+                        merged_tags = list(dict.fromkeys(primary_tags + dup_tags))
+                        m_primary.tags = merged_tags
+
+                        # Create link
+                        link = MemoryLink(
+                            workspace_id=workspace_id,
+                            source_memory_id=m_duplicate.id,
+                            target_memory_id=m_primary.id,
+                            relationship_type="superseded_by",
+                            confidence=round(float(sim), 4),
+                        )
+                        db.add(link)
+                        consolidated_count += 1
+
+        if consolidated_count > 0:
+            await db.commit()
+            SemanticCache.invalidate_workspace(workspace_id)
+
+        return {
+            "scanned_count": scanned_count,
+            "duplicates_found": duplicates_found,
+            "consolidated_count": consolidated_count,
+            "details": details,
+        }
+
+    @staticmethod
+    def compute_integrity_signature(
+        workspace_id: str,
+        memory_id: str,
+        content: str,
+        category: str,
+        importance: int,
+    ) -> str:
+        """
+        Cryptographic HMAC-SHA256 data integrity checksum.
+        Detects unauthorized external SQL tampering or direct row alteration.
+        """
+        import hashlib
+        import hmac
+
+        from app.core.config import settings
+
+        base = f"{workspace_id}:{memory_id}:{content}:{category}:{importance}".encode()
+        secret = settings.SECRET_KEY.encode("utf-8")
+        return hmac.new(secret, base, hashlib.sha256).hexdigest()
+
+    @staticmethod
+    def compute_retention_strength(
+        memory: Memory,
+        now: datetime | None = None,
+    ) -> tuple[float, float, int]:
+        """
+        Biological Ebbinghaus Forgetting Curve: R(t) = exp(-t / S)
+        Returns:
+            (retention_strength: float 0..1, stability_days: float, access_count: int)
+        """
+        import math
+
+        meta = memory.extra_metadata or {}
+        access_count = int(meta.get("access_count", 1))
+
+        if memory.is_pinned:
+            return 1.0, 365.0, access_count
+
+        current_time = now or datetime.now(UTC)
+        base_stability = 30.0
+        stability_days = base_stability * (1.0 + 0.5 * math.log(1.0 + access_count))
+
+        last_str = meta.get("last_accessed_at")
+        if last_str:
+            try:
+                dt = datetime.fromisoformat(last_str)
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=UTC)
+            except Exception:
+                dt = memory.created_at
+        else:
+            dt = memory.created_at
+
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=UTC)
+
+        delta_days = max(0.0, (current_time - dt).total_seconds() / 86400.0)
+        retention = math.exp(-delta_days / stability_days)
+        return max(0.0, min(1.0, round(retention, 4))), round(stability_days, 2), access_count
+
+    @staticmethod
+    async def reinforce_memory(
+        db: AsyncSession,
+        workspace_id: str,
+        memory_id: str,
+        user_id: str,
+    ) -> dict:
+        """
+        Active Memory Reinforcement: boosts stability factor and resets elapsed decay window.
+        """
+        memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        now = datetime.now(UTC)
+        meta = dict(memory.extra_metadata or {})
+        access_count = int(meta.get("access_count", 0)) + 2
+        meta["access_count"] = access_count
+        meta["last_accessed_at"] = now.isoformat()
+        meta["last_reinforced_at"] = now.isoformat()
+        meta["integrity_signature"] = MemoryService.compute_integrity_signature(
+            workspace_id=workspace_id,
+            memory_id=memory.id,
+            content=memory.content,
+            category=memory.category.value
+            if hasattr(memory.category, "value")
+            else str(memory.category),
+            importance=memory.importance,
+        )
+        memory.extra_metadata = meta
+        flag_modified(memory, "extra_metadata")
+        await db.commit()
+        await db.refresh(memory)
+
+        strength, stability, acc = MemoryService.compute_retention_strength(memory, now=now)
+        return {
+            "id": memory.id,
+            "workspace_id": memory.workspace_id,
+            "retention_strength": strength,
+            "stability_days": stability,
+            "access_count": acc,
+            "last_reinforced_at": now,
+        }
+
+    @staticmethod
+    async def get_decay_analytics(
+        db: AsyncSession,
+        workspace_id: str,
+        now: datetime | None = None,
+    ) -> dict:
+        """
+        Analyzes memory decay distribution across workspace using Ebbinghaus curve.
+        Categorizes memories into Strong (>=0.70), Fading (0.30..0.70), and Dormant (<0.30).
+        """
+        q = select(Memory).where(
+            Memory.workspace_id == workspace_id,
+            Memory.status == MemoryStatus.APPROVED,
+        )
+        res = await db.execute(q)
+        memories = list(res.scalars().all())
+
+        total = len(memories)
+        if total == 0:
+            return {
+                "total_memories": 0,
+                "strong_count": 0,
+                "fading_count": 0,
+                "dormant_count": 0,
+                "average_retention": 1.0,
+                "dormant_memory_ids": [],
+            }
+
+        strong_count = 0
+        fading_count = 0
+        dormant_count = 0
+        dormant_ids = []
+        total_retention = 0.0
+
+        for m in memories:
+            strength, _, _ = MemoryService.compute_retention_strength(m, now=now)
+            total_retention += strength
+            if strength >= 0.70:
+                strong_count += 1
+            elif strength >= 0.30:
+                fading_count += 1
+            else:
+                dormant_count += 1
+                dormant_ids.append(m.id)
+
+        avg_retention = round(total_retention / total, 4)
+        return {
+            "total_memories": total,
+            "strong_count": strong_count,
+            "fading_count": fading_count,
+            "dormant_count": dormant_count,
+            "average_retention": avg_retention,
+            "dormant_memory_ids": dormant_ids,
+        }
+
+    @staticmethod
+    async def verify_workspace_integrity(
+        db: AsyncSession,
+        workspace_id: str,
+    ) -> dict:
+        """
+        Cryptographically verifies row-level HMAC-SHA256 signatures for all workspace memories.
+        Detects unauthorized external direct SQL row edits or tampering.
+        """
+        import hmac
+
+        q = select(Memory).where(Memory.workspace_id == workspace_id)
+        res = await db.execute(q)
+        memories = list(res.scalars().all())
+
+        valid_count = 0
+        tampered_count = 0
+        tampered_ids = []
+
+        for m in memories:
+            meta = m.extra_metadata or {}
+            stored_sig = meta.get("integrity_signature")
+            expected_sig = MemoryService.compute_integrity_signature(
+                workspace_id=m.workspace_id,
+                memory_id=m.id,
+                content=m.content,
+                category=m.category.value if hasattr(m.category, "value") else str(m.category),
+                importance=m.importance,
+            )
+            if stored_sig and hmac.compare_digest(stored_sig, expected_sig):
+                valid_count += 1
+            else:
+                tampered_count += 1
+                tampered_ids.append(m.id)
+
+        return {
+            "total_checked": len(memories),
+            "valid_count": valid_count,
+            "tampered_count": tampered_count,
+            "tampered_ids": tampered_ids,
+            "is_compromised": tampered_count > 0,
+            "verified_at": datetime.now(UTC),
+        }
+
+    @staticmethod
+    async def preview_conflict_diff(
+        db: AsyncSession,
+        workspace_id: str,
+        memory_id: str,
+        user_id: str,
+    ) -> dict:
+        """Preview fine-grained semantic fact diff between candidate memory and its conflicting counterpart."""
+        memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        conflicting_id = (memory.extra_metadata or {}).get("conflicting_memory_id")
+        prev_mem = None
+        if conflicting_id:
+            prev_mem = await db.get(Memory, conflicting_id)
+
+        from app.ai.fact_differ import SemanticFactDiffer
+
+        diff = SemanticFactDiffer.compute_diff(
+            old_content=prev_mem.content if prev_mem else "",
+            new_content=memory.content,
+        )
+        return {
+            "old_content": diff.old_content,
+            "new_content": diff.new_content,
+            "similarity_score": diff.similarity_score,
+            "added_tokens": diff.added_tokens,
+            "removed_tokens": diff.removed_tokens,
+            "contradicted_entities": diff.contradicted_entities,
+            "temporal_shift_summary": diff.temporal_shift_summary,
+        }
+
+    @staticmethod
+    async def resolve_conflict(
+        db: AsyncSession,
+        workspace_id: str,
+        memory_id: str,
+        user_id: str,
+        data: MemoryConflictResolutionRequest,
+        is_admin_or_owner: bool = False,
+    ) -> dict:
+        """Interactively resolve candidate memory contradictions using supersede, merge, keep_both, or discard."""
+        memory = await MemoryService.get_memory(db, workspace_id, memory_id)
+        if memory.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to resolve conflict for this memory.",
+            )
+
+        strategy = data.strategy.lower().strip()
+        if strategy not in ("supersede", "merge", "keep_both", "discard"):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=(
+                    f"Unsupported conflict resolution strategy '{data.strategy}'. "
+                    f"Choose supersede, merge, keep_both, or discard."
+                ),
+            )
+
+        meta = dict(memory.extra_metadata or {})
+        conflicting_id = meta.get("conflicting_memory_id")
+        prev_mem = None
+        if conflicting_id:
+            prev_mem = await db.get(Memory, conflicting_id)
+
+        from app.ai.fact_differ import SemanticFactDiffer
+
+        diff = SemanticFactDiffer.compute_diff(
+            old_content=prev_mem.content if prev_mem else "",
+            new_content=memory.content,
+        )
+
+        now_dt = datetime.now(UTC)
+
+        if strategy == "supersede":
+            memory.status = MemoryStatus.APPROVED
+            if prev_mem:
+                prev_mem.status = MemoryStatus.SUPERSEDED
+                prev_mem.superseded_by = memory.id
+                link = MemoryLink(
+                    workspace_id=workspace_id,
+                    source_memory_id=memory.id,
+                    target_memory_id=prev_mem.id,
+                    relationship_type="supersedes",
+                    confidence=1.0,
+                )
+                db.add(link)
+
+        elif strategy == "merge":
+            if not data.merged_content or not data.merged_content.strip():
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Parameter 'merged_content' is required when resolution strategy is 'merge'.",
+                )
+            # Record historical version
+            v_num = 1
+            max_v_res = await db.execute(
+                select(func.max(MemoryVersion.version_number)).where(
+                    MemoryVersion.memory_id == memory.id
+                )
+            )
+            max_v = max_v_res.scalar()
+            if max_v:
+                v_num = max_v + 1
+
+            new_v = MemoryVersion(
+                memory_id=memory.id,
+                version_number=v_num,
+                content=memory.content,
+                category=(
+                    memory.category.value
+                    if hasattr(memory.category, "value")
+                    else str(memory.category)
+                ),
+                changed_by_user_id=user_id,
+                change_reason=f"Synthesized merge conflict resolution: {data.notes or 'Consolidated facts'}",
+            )
+            db.add(new_v)
+
+            memory.content = data.merged_content.strip()
+            memory.status = MemoryStatus.APPROVED
+            if prev_mem:
+                prev_mem.status = MemoryStatus.SUPERSEDED
+                prev_mem.superseded_by = memory.id
+
+        elif strategy == "keep_both":
+            memory.status = MemoryStatus.APPROVED
+            meta["contextual_distinction"] = True
+            if prev_mem:
+                prev_meta = dict(prev_mem.extra_metadata or {})
+                prev_meta["contextual_distinction"] = True
+                prev_mem.extra_metadata = prev_meta
+                flag_modified(prev_mem, "extra_metadata")
+
+        elif strategy == "discard":
+            memory.status = MemoryStatus.REJECTED
+            meta["discard_reason"] = data.notes or "Discarded in favor of existing memory record."
+
+        meta["conflict_resolved"] = True
+        meta["conflict_resolution_strategy"] = strategy
+        meta["conflict_resolved_at"] = now_dt.isoformat()
+        if data.notes:
+            meta["conflict_resolution_notes"] = data.notes
+
+        memory.extra_metadata = meta
+        flag_modified(memory, "extra_metadata")
+
+        # Invalidate semantic cache
+        from app.ai.semantic_cache import SemanticCache
+
+        SemanticCache.invalidate_workspace(workspace_id)
+
+        await db.commit()
+        await db.refresh(memory)
+
+        return {
+            "resolved_memory_id": memory.id,
+            "previous_memory_id": prev_mem.id if prev_mem else None,
+            "strategy": strategy,
+            "status": memory.status.value,
+            "fact_diff": {
+                "old_content": diff.old_content,
+                "new_content": diff.new_content,
+                "similarity_score": diff.similarity_score,
+                "added_tokens": diff.added_tokens,
+                "removed_tokens": diff.removed_tokens,
+                "contradicted_entities": diff.contradicted_entities,
+                "temporal_shift_summary": diff.temporal_shift_summary,
+            },
+            "resolved_at": now_dt,
+        }
+
+    @classmethod
+    async def auto_consolidate_workspace_memories(
+        cls,
+        db: AsyncSession,
+        workspace_id: str,
+        user_id: str,
+        request: MemoryAutoConsolidateRequest,
+    ) -> dict[str, Any]:
+        """Abstracts and consolidates granular episodic memories into high-order semantic principles."""
+        from app.ai.consolidation import MemoryConsolidationEngine
+        from app.ai.semantic_cache import SemanticCache
+        from app.core.audit import SecurityAuditLogger
+
+        # Fetch active approved memories for this workspace
+        q = (
+            select(Memory)
+            .where(
+                Memory.workspace_id == workspace_id,
+                Memory.status == MemoryStatus.APPROVED,
+            )
+            .order_by(desc(Memory.created_at))
+        )
+        res = await db.execute(q)
+        memories = list(res.scalars().all())
+
+        clusters = MemoryConsolidationEngine.cluster_memories(
+            memories=memories,
+            min_memories=request.min_memories,
+            target_topic=request.topic,
+        )
+
+        cluster_results = []
+        source_id_map: dict[str, Memory] = {m.id: m for m in memories}
+        total_source_count = 0
+        now_dt = datetime.now(UTC)
+
+        for cl in clusters:
+            syn_data = MemoryConsolidationEngine.synthesize_cluster(cl)
+            total_source_count += len(syn_data.source_memory_ids)
+            cluster_results.append(
+                {
+                    "topic": syn_data.topic,
+                    "source_memory_ids": syn_data.source_memory_ids,
+                    "synthesized_content": syn_data.synthesized_content,
+                    "confidence": syn_data.confidence,
+                    "compression_ratio": syn_data.compression_ratio,
+                    "source_categories": syn_data.source_categories,
+                }
+            )
+
+        if request.dry_run:
+            return {
+                "clusters": cluster_results,
+                "total_source_memories": total_source_count,
+                "consolidated_memories_created": 0,
+                "new_memory_ids": [],
+                "dry_run": True,
+                "consolidated_at": now_dt,
+            }
+
+        # Commit mode: persist new synthesized memories and links
+        new_memory_ids: list[str] = []
+        embedding_provider = get_embedding_provider()
+
+        for c_data in cluster_results:
+            emb = None
+            try:
+                emb = await embedding_provider.embed_query(c_data["synthesized_content"])
+            except Exception as e:
+                logger.warning("Failed to generate embedding for consolidated memory: %s", e)
+
+            new_mem = Memory(
+                workspace_id=workspace_id,
+                user_id=user_id,
+                content=c_data["synthesized_content"],
+                category=request.target_category,
+                status=MemoryStatus.APPROVED,
+                source_type="consolidation",
+                importance=8,
+                confidence=c_data["confidence"],
+                tags=["consolidated", "synthesized", c_data["topic"].lower()],
+                extra_metadata={
+                    "synthesized_from_ids": c_data["source_memory_ids"],
+                    "cluster_topic": c_data["topic"],
+                    "compression_ratio": c_data["compression_ratio"],
+                    "consolidation_timestamp": now_dt.isoformat(),
+                },
+                embedding=emb,
+            )
+            db.add(new_mem)
+            await db.flush()
+            new_memory_ids.append(new_mem.id)
+
+            # Create bidirectional MemoryLink
+            for src_id in c_data["source_memory_ids"]:
+                link = MemoryLink(
+                    workspace_id=workspace_id,
+                    source_memory_id=new_mem.id,
+                    target_memory_id=src_id,
+                    relationship_type="CONSOLIDATES",
+                    confidence=c_data["confidence"],
+                )
+                db.add(link)
+
+                # Annotate source memory
+                src_mem = source_id_map.get(src_id)
+                if src_mem:
+                    src_meta = dict(src_mem.extra_metadata or {})
+                    src_meta["consolidated_into"] = new_mem.id
+                    src_mem.extra_metadata = src_meta
+                    flag_modified(src_mem, "extra_metadata")
+
+        SemanticCache.invalidate_workspace(workspace_id)
+        await SecurityAuditLogger.log_event(
+            db=db,
+            action="memories.consolidate",
+            workspace_id=workspace_id,
+            user_id=user_id,
+            details={
+                "clusters_count": len(cluster_results),
+                "total_source_memories": total_source_count,
+                "new_memory_ids": new_memory_ids,
+            },
+        )
+        await db.commit()
+
+        return {
+            "clusters": cluster_results,
+            "total_source_memories": total_source_count,
+            "consolidated_memories_created": len(new_memory_ids),
+            "new_memory_ids": new_memory_ids,
+            "dry_run": False,
+            "consolidated_at": now_dt,
+        }
+
+    @classmethod
+    async def get_memory_associations(
+        cls,
+        db: AsyncSession,
+        workspace_id: str,
+        memory_id: str,
+        max_hops: int = 2,
+        min_activation: float = 0.15,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Traverse spreading activation associative graph for seed memory."""
+        from app.ai.associative_memory import AssociativeMemoryExplorer
+
+        return await AssociativeMemoryExplorer.explore_associations(
+            db=db,
+            workspace_id=workspace_id,
+            seed_memory_id=memory_id,
+            max_hops=max_hops,
+            min_activation=min_activation,
+            limit=limit,
+        )

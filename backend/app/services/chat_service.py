@@ -7,6 +7,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.ai.context_assembler import ContextAssembler
+from app.ai.data_leakage_guard import DataLeakageGuard
 from app.ai.factory import get_llm_provider
 from app.ai.reranker import Reranker
 from app.ai.retrieval import HybridSearchEngine
@@ -91,8 +92,15 @@ class ChatService:
         db: AsyncSession,
         workspace_id: str,
         conversation_id: str,
+        current_user_id: str | None = None,
+        is_admin_or_owner: bool = False,
     ) -> bool:
         conv = await ChatService.get_conversation(db, workspace_id, conversation_id)
+        if current_user_id and conv.user_id != current_user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to delete this conversation.",
+            )
         await db.delete(conv)
         await db.commit()
         return True
@@ -165,6 +173,27 @@ class ChatService:
             {"role": m.role, "content": m.content} for m in prev_messages if m.id != user_msg.id
         ]
 
+        # Multi-Tenant Semantic Cache Check
+        from app.ai.semantic_cache import SemanticCache
+
+        if len(history) == 0:
+            cached_result = SemanticCache.get(workspace_id, content)
+            if cached_result:
+                cached_content, cached_citations = cached_result
+                assistant_msg = ChatMessage(
+                    conversation_id=conv.id,
+                    workspace_id=workspace_id,
+                    role=MessageRole.ASSISTANT.value,
+                    content=cached_content,
+                    token_count=int(len(cached_content.split()) * 1.3),
+                    citations=cached_citations,
+                    extra_metadata={"model": conv.model, "cached": True, "cache_hit": True},
+                )
+                db.add(assistant_msg)
+                await db.commit()
+                await db.refresh(assistant_msg)
+                return assistant_msg
+
         # 6. Assemble context
         assembled = ContextAssembler.assemble(
             user_query=content,
@@ -180,15 +209,37 @@ class ChatService:
             temperature=conv.temperature,
         )
 
+        # Cache synthesized response for identical subsequent queries
+        from app.ai.data_leakage_guard import DataLeakageGuard
+
+        leakage_check = DataLeakageGuard.sanitize(
+            text=llm_response.content,
+            current_workspace_id=workspace_id,
+        )
+        safe_content = leakage_check.sanitized_text
+
+        if len(history) == 0:
+            SemanticCache.set(
+                workspace_id=workspace_id,
+                query=content,
+                content=safe_content,
+                citations=assembled.citations,
+                ttl_seconds=3600,
+            )
+
         # 8. Save assistant message
         assistant_msg = ChatMessage(
             conversation_id=conv.id,
             workspace_id=workspace_id,
             role=MessageRole.ASSISTANT.value,
-            content=llm_response.content,
-            token_count=int(len(llm_response.content.split()) * 1.3),
+            content=safe_content,
+            token_count=int(len(safe_content.split()) * 1.3),
             citations=assembled.citations,
-            extra_metadata={"model": conv.model, "usage": llm_response.usage},
+            extra_metadata={
+                "model": conv.model,
+                "usage": llm_response.usage,
+                "leakage_sanitized": not leakage_check.is_clean,
+            },
         )
         db.add(assistant_msg)
         await db.commit()
@@ -248,13 +299,22 @@ class ChatService:
             yield f"event: token\ndata: {json.dumps({'token': token + ' '})}\n\n"
 
         # Save complete message
+        leakage_stream_check = DataLeakageGuard.sanitize(
+            text=llm_resp.content,
+            current_workspace_id=workspace_id,
+        )
+        safe_stream_content = leakage_stream_check.sanitized_text
+
         assistant_msg = ChatMessage(
             conversation_id=conv.id,
             workspace_id=workspace_id,
             role=MessageRole.ASSISTANT.value,
-            content=llm_resp.content,
-            token_count=int(len(llm_resp.content.split()) * 1.3),
+            content=safe_stream_content,
+            token_count=int(len(safe_stream_content.split()) * 1.3),
             citations=assembled.citations,
+            extra_metadata={
+                "leakage_sanitized": not leakage_stream_check.is_clean,
+            },
         )
         db.add(assistant_msg)
         await db.commit()
@@ -268,17 +328,20 @@ class ChatService:
         workspace_id: str,
         message_id: str,
         rating: int,
+        conversation_id: str | None = None,
     ) -> ChatMessage:
         query = select(ChatMessage).where(
             ChatMessage.id == message_id,
             ChatMessage.workspace_id == workspace_id,
         )
+        if conversation_id:
+            query = query.where(ChatMessage.conversation_id == conversation_id)
         res = await db.execute(query)
         msg = res.scalar_one_or_none()
         if not msg:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Chat message not found.",
+                detail="Chat message not found in specified conversation.",
             )
         msg.feedback = rating
         await db.commit()

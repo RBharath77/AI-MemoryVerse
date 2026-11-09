@@ -170,32 +170,32 @@ export default function DocumentLibraryPage() {
   return (
     <div className="p-6 sm:p-8 max-w-7xl mx-auto space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-navy-800">
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 pb-6 border-b border-[#EEEBDA] dark:border-navy-800">
         <div>
           <div className="flex items-center space-x-2">
-            <FileText className="w-6 h-6 text-blue-400" />
-            <h1 className="text-2xl font-extrabold text-white tracking-tight">
+            <FileText className="w-6 h-6 text-[#014BAA] dark:text-blue-400" />
+            <h1 className="text-2xl font-extrabold text-[#282B4A] dark:text-white tracking-tight">
               Document Intelligence
             </h1>
           </div>
-          <p className="text-xs sm:text-sm text-slate-400 mt-1">
+          <p className="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1">
             Upload, parse, and chunk PDF, DOCX, TXT, Markdown, CSV, and HTML documents for RAG.
           </p>
         </div>
 
         <label
-          className={`px-4 py-2 rounded-lg bg-blue-500 hover:bg-blue-400 text-white font-semibold text-xs flex items-center justify-center space-x-2 shadow-lg shadow-blue-500/20 transition-colors cursor-pointer ${
+          className={`px-4 py-2 rounded-xl bg-[#014BAA] hover:bg-[#014BAA]/90 text-[#F8F3F0] font-bold text-xs flex items-center justify-center space-x-2 shadow-md shadow-[#014BAA]/25 transition-all cursor-pointer ${
             isUploading ? "opacity-50 pointer-events-none" : ""
           }`}
         >
           {isUploading ? (
             <>
-              <Loader2 className="w-4 h-4 animate-spin" />
+              <Loader2 className="w-4 h-4 animate-spin text-[#F8F3F0]" />
               <span>Uploading & Parsing...</span>
             </>
           ) : (
             <>
-              <Upload className="w-4 h-4" />
+              <Upload className="w-4 h-4 text-[#F8F3F0]" />
               <span>Upload Document</span>
             </>
           )}
@@ -210,7 +210,7 @@ export default function DocumentLibraryPage() {
       </div>
 
       {uploadError && (
-        <div className="p-3 rounded-lg border border-red-500/30 bg-red-950/30 text-red-400 text-xs flex items-center space-x-2">
+        <div className="p-3 rounded-xl border border-red-500/30 bg-red-950/30 text-red-400 text-xs flex items-center space-x-2">
           <AlertCircle className="w-4 h-4 shrink-0" />
           <span>{uploadError}</span>
         </div>
@@ -219,17 +219,17 @@ export default function DocumentLibraryPage() {
       {/* Search and Filters */}
       <div className="flex items-center justify-between gap-4">
         <div className="relative w-full sm:w-80">
-          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder="Search documents by name or title..."
-            className="w-full pl-9 pr-4 py-2 bg-navy-900/80 border border-navy-800 rounded-lg text-xs text-white placeholder-slate-500 focus:outline-none focus:border-blue-500 transition-colors"
+            className="w-full pl-9 pr-4 py-2 bg-white dark:bg-navy-900/80 border border-[#EEEBDA] dark:border-navy-800 rounded-lg text-xs text-[#282B4A] dark:text-white placeholder-slate-400 focus:outline-none focus:border-[#014BAA] transition-colors"
           />
         </div>
 
-        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-navy-900 border border-navy-700 text-slate-300">
+        <span className="text-xs font-semibold px-3 py-1.5 rounded-full bg-white dark:bg-navy-900 border border-[#EEEBDA] dark:border-navy-700 text-[#282B4A] dark:text-slate-300 shadow-xs">
           {documents.length} documents
         </span>
       </div>
@@ -237,16 +237,16 @@ export default function DocumentLibraryPage() {
       {/* Documents List */}
       {isLoading ? (
         <div className="py-20 flex flex-col items-center justify-center text-slate-400 space-y-3">
-          <Loader2 className="w-8 h-8 animate-spin text-blue-400" />
+          <Loader2 className="w-8 h-8 animate-spin text-[#014BAA] dark:text-blue-400" />
           <p className="text-xs">Loading document library...</p>
         </div>
       ) : documents.length === 0 ? (
-        <div className="py-16 px-4 rounded-2xl border border-navy-800 bg-navy-900/20 text-center">
-          <div className="w-12 h-12 rounded-xl bg-navy-900 border border-navy-700 flex items-center justify-center mx-auto mb-4 text-blue-400">
+        <div className="py-16 px-4 rounded-2xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/20 text-center shadow-sm">
+          <div className="w-12 h-12 rounded-xl bg-[#014BAA]/10 border border-[#014BAA]/20 flex items-center justify-center mx-auto mb-4 text-[#014BAA] dark:text-blue-400">
             <FileText className="w-6 h-6" />
           </div>
-          <h3 className="text-base font-bold text-white mb-1">No documents found</h3>
-          <p className="text-xs text-slate-400 max-w-sm mx-auto mb-6">
+          <h3 className="text-base font-bold text-[#282B4A] dark:text-white mb-1">No documents found</h3>
+          <p className="text-xs text-slate-500 dark:text-slate-400 max-w-sm mx-auto mb-6">
             Upload your technical documentation, research papers, design specs, or notes to ground AI answers with verifiable sources.
           </p>
         </div>
@@ -257,15 +257,15 @@ export default function DocumentLibraryPage() {
             return (
               <div
                 key={doc.id}
-                className="p-4 rounded-xl border border-navy-800 bg-navy-900/40 hover:border-navy-700 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+                className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-white dark:bg-navy-900/40 hover:border-[#014BAA]/40 transition-all flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm"
               >
                 <div className="flex items-start space-x-3 flex-1 min-w-0">
-                  <div className="p-2.5 rounded-lg bg-navy-950 border border-navy-800 text-blue-400 shrink-0 mt-0.5">
+                  <div className="p-2.5 rounded-lg bg-[#014BAA]/10 border border-[#014BAA]/20 text-[#014BAA] dark:text-blue-400 shrink-0 mt-0.5">
                     <Icon className="w-5 h-5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center space-x-2">
-                      <h4 className="text-sm font-bold text-white truncate">{doc.title}</h4>
+                      <h4 className="text-sm font-bold text-[#282B4A] dark:text-white truncate">{doc.title}</h4>
                       <span
                         className={`text-[10px] font-bold uppercase tracking-wider px-2 py-0.5 rounded border ${getStatusBadge(
                           doc.status
@@ -274,7 +274,7 @@ export default function DocumentLibraryPage() {
                         {doc.status}
                       </span>
                     </div>
-                    <p className="text-xs text-slate-400 truncate mt-0.5">{doc.filename}</p>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 truncate mt-0.5">{doc.filename}</p>
                     <div className="text-[11px] text-slate-500 flex flex-wrap items-center gap-3 mt-1.5">
                       <span>Size: {formatFileSize(doc.file_size)}</span>
                       <span>Chunks: {doc.chunk_count}</span>
@@ -282,7 +282,7 @@ export default function DocumentLibraryPage() {
                       <span>Uploaded: {formatDate(doc.created_at)}</span>
                     </div>
                     {doc.error_message && (
-                      <p className="text-[11px] text-red-400 mt-1">Error: {doc.error_message}</p>
+                      <p className="text-[11px] text-red-500 mt-1">Error: {doc.error_message}</p>
                     )}
                   </div>
                 </div>
@@ -292,7 +292,7 @@ export default function DocumentLibraryPage() {
                   {doc.chunk_count > 0 && (
                     <button
                       onClick={() => handleInspectChunks(doc)}
-                      className="px-3 py-1.5 rounded-lg border border-navy-700 hover:border-cyan-500/40 hover:bg-cyan-950/20 text-slate-300 hover:text-cyan-400 text-xs font-semibold flex items-center space-x-1.5 transition-colors"
+                      className="px-3 py-1.5 rounded-lg border border-[#EEEBDA] dark:border-navy-700 hover:border-[#014BAA]/40 hover:bg-[#014BAA]/10 text-slate-600 dark:text-slate-300 hover:text-[#014BAA] dark:hover:text-cyan-400 text-xs font-semibold flex items-center space-x-1.5 transition-colors shadow-xs"
                       title="Inspect chunks"
                     >
                       <Eye className="w-3.5 h-3.5" />
@@ -302,7 +302,7 @@ export default function DocumentLibraryPage() {
                   {doc.status === "failed" && (
                     <button
                       onClick={() => handleRetry(doc.id)}
-                      className="p-1.5 rounded-lg border border-navy-700 hover:border-amber-500/40 hover:bg-amber-950/20 text-slate-400 hover:text-amber-400 transition-colors"
+                      className="p-1.5 rounded-lg border border-[#EEEBDA] dark:border-navy-700 hover:border-amber-500/40 hover:bg-amber-50 dark:hover:bg-amber-950/20 text-slate-500 hover:text-amber-600 transition-colors"
                       title="Retry processing"
                     >
                       <RefreshCw className="w-4 h-4" />
@@ -310,14 +310,14 @@ export default function DocumentLibraryPage() {
                   )}
                   <button
                     onClick={() => handleDownload(doc.id)}
-                    className="p-1.5 rounded-lg border border-navy-700 hover:border-blue-500/40 hover:bg-blue-950/20 text-slate-400 hover:text-blue-400 transition-colors"
+                    className="p-1.5 rounded-lg border border-[#EEEBDA] dark:border-navy-700 hover:border-[#014BAA]/40 hover:bg-slate-50 dark:hover:bg-blue-950/20 text-slate-500 hover:text-[#014BAA] transition-colors"
                     title="Download file"
                   >
                     <Download className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleDelete(doc.id)}
-                    className="p-1.5 rounded-lg border border-navy-700 hover:border-red-500/40 hover:bg-red-950/20 text-slate-400 hover:text-red-400 transition-colors"
+                    className="p-1.5 rounded-lg border border-[#EEEBDA] dark:border-navy-700 hover:border-red-500/40 hover:bg-red-50 dark:hover:bg-red-950/20 text-slate-400 hover:text-red-500 transition-colors"
                     title="Delete document"
                   >
                     <Trash2 className="w-4 h-4" />
@@ -331,21 +331,21 @@ export default function DocumentLibraryPage() {
 
       {/* Inspect Chunks Modal */}
       {selectedDoc && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-navy-950/80 backdrop-blur-sm">
-          <div className="bg-navy-900 border border-navy-700 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl">
-            <div className="p-5 border-b border-navy-800 flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white dark:bg-navy-900 border border-[#EEEBDA] dark:border-navy-700 rounded-2xl w-full max-w-3xl max-h-[85vh] flex flex-col shadow-2xl animate-in zoom-in-95 duration-150">
+            <div className="p-5 border-b border-[#EEEBDA] dark:border-navy-800 flex items-center justify-between">
               <div>
-                <h3 className="text-base font-bold text-white flex items-center space-x-2">
-                  <FileText className="w-4 h-4 text-cyan-400" />
+                <h3 className="text-base font-bold text-[#282B4A] dark:text-white flex items-center space-x-2">
+                  <FileText className="w-4 h-4 text-[#014BAA] dark:text-cyan-400" />
                   <span>Document Chunks: {selectedDoc.title}</span>
                 </h3>
-                <p className="text-xs text-slate-400 mt-0.5">
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                   Showing {chunks.length} vectorized semantic chunks used for context injection.
                 </p>
               </div>
               <button
                 onClick={() => setSelectedDoc(null)}
-                className="text-slate-400 hover:text-white"
+                className="text-slate-400 hover:text-[#282B4A] dark:hover:text-white transition-colors"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -354,7 +354,7 @@ export default function DocumentLibraryPage() {
             <div className="p-5 overflow-y-auto space-y-4 flex-1">
               {isLoadingChunks ? (
                 <div className="py-12 flex flex-col items-center justify-center text-slate-400 space-y-2">
-                  <Loader2 className="w-6 h-6 animate-spin text-cyan-400" />
+                  <Loader2 className="w-6 h-6 animate-spin text-[#014BAA] dark:text-cyan-400" />
                   <p className="text-xs">Loading chunks...</p>
                 </div>
               ) : chunks.length === 0 ? (
@@ -363,20 +363,20 @@ export default function DocumentLibraryPage() {
                 chunks.map((chunk) => (
                   <div
                     key={chunk.id}
-                    className="p-4 rounded-xl border border-navy-800 bg-navy-950/60 space-y-2"
+                    className="p-4 rounded-xl border border-[#EEEBDA] dark:border-navy-800 bg-[#F8F3F0] dark:bg-navy-950/60 space-y-2 shadow-xs"
                   >
-                    <div className="flex items-center justify-between text-[11px] text-slate-400 pb-2 border-b border-navy-800/60">
-                      <span className="font-mono text-cyan-400">Chunk #{chunk.chunk_index + 1}</span>
+                    <div className="flex items-center justify-between text-[11px] text-slate-500 dark:text-slate-400 pb-2 border-b border-[#EEEBDA] dark:border-navy-800/60">
+                      <span className="font-mono text-[#014BAA] dark:text-cyan-400 font-bold">Chunk #{chunk.chunk_index + 1}</span>
                       <div className="flex items-center space-x-3">
                         {chunk.section_title && (
-                          <span className="text-slate-300 font-semibold truncate max-w-xs">
+                          <span className="text-[#282B4A] dark:text-slate-300 font-semibold truncate max-w-xs">
                             Section: {chunk.section_title}
                           </span>
                         )}
-                        <span className="font-mono text-slate-500">~{chunk.token_count} tokens</span>
+                        <span className="font-mono text-slate-400">~{chunk.token_count} tokens</span>
                       </div>
                     </div>
-                    <p className="text-xs text-slate-200 whitespace-pre-wrap leading-relaxed font-mono">
+                    <p className="text-xs text-[#282B4A] dark:text-slate-200 whitespace-pre-wrap leading-relaxed font-mono">
                       {chunk.content}
                     </p>
                   </div>
@@ -384,10 +384,10 @@ export default function DocumentLibraryPage() {
               )}
             </div>
 
-            <div className="p-4 border-t border-navy-800 flex justify-end">
+            <div className="p-4 border-t border-[#EEEBDA] dark:border-navy-800 flex justify-end">
               <button
                 onClick={() => setSelectedDoc(null)}
-                className="px-4 py-2 rounded-lg bg-navy-800 hover:bg-navy-700 text-xs font-semibold text-white transition-colors"
+                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 dark:bg-navy-800 dark:hover:bg-navy-700 text-xs font-semibold text-[#282B4A] dark:text-white transition-colors"
               >
                 Close Inspector
               </button>

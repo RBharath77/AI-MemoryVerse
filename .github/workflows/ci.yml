@@ -50,6 +50,14 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-asyncio pytest-cov httpx
 
+      - name: Verify Alembic Migrations
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@localhost:5432/memoryverse_test
+          DATABASE_SYNC_URL: postgresql+psycopg2://postgres:postgrespassword@localhost:5432/memoryverse_test
+        run: |
+          cd backend
+          alembic upgrade head
+
       - name: Run Pytest Test Suite
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgrespassword@localhost:5432/memoryverse_test

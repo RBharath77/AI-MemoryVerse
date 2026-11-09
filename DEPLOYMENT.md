@@ -40,6 +40,22 @@ This guide details how to run AI-MemoryVerse locally and deploy it to production
    ```
    Access application at `http://localhost:3000`.
 
+### Option B: Full Containerized Stack with HTTPS Load Balancer
+Run the complete commercial-grade architecture locally behind an Nginx HTTPS load balancer with TLS termination, rate limiting, and health-checked upstream routing:
+
+1. **Generate Local TLS/SSL Certificates:**
+   ```bash
+   bash scripts/generate_ssl_certs.sh
+   ```
+2. **Start All Services with Load Balancer:**
+   ```bash
+   docker compose up -d --build
+   ```
+3. **Access via Secure HTTPS:**
+   - **HTTPS Web Interface & API:** `https://localhost` (or `https://127.0.0.1`)
+   - **HTTP Automatic Redirect:** `http://localhost` (Permanently redirects to `https://localhost`)
+   - **API Documentation:** `https://localhost/docs`
+
 ---
 
 ## 2. Production Deployment on Render

@@ -13,17 +13,25 @@ const config: Config = {
       colors: {
         background: "var(--background)",
         foreground: "var(--foreground)",
+        // Custom palette provided by user:
+        // #014BAA (Cobalt Blue), #F8F3F0 (Alabaster), #282B4A (Deep Slate Indigo), #EEEBDA (Warm Linen)
+        mv: {
+          blue: "#014BAA",
+          alabaster: "#F8F3F0",
+          indigo: "#282B4A",
+          linen: "#EEEBDA",
+        },
         navy: {
-          950: "#070b14",
-          900: "#0b1329",
-          850: "#0f1b3b",
-          800: "#14234d",
-          700: "#1e336e",
+          950: "rgb(var(--mv-bg-950) / <alpha-value>)",
+          900: "rgb(var(--mv-bg-900) / <alpha-value>)",
+          850: "rgb(var(--mv-bg-850) / <alpha-value>)",
+          800: "rgb(var(--mv-border-800) / <alpha-value>)",
+          700: "rgb(var(--mv-border-700) / <alpha-value>)",
         },
         brand: {
-          cyan: "#06b6d4",
-          blue: "#3b82f6",
-          violet: "#8b5cf6",
+          cyan: "#014BAA",
+          blue: "#014BAA",
+          violet: "#282B4A",
           emerald: "#10b981",
           amber: "#f59e0b",
         },
@@ -37,4 +45,3 @@ const config: Config = {
   plugins: [],
 };
 export default config;
-

@@ -1,0 +1,15 @@
+python-interpreter-path = "/Users/BharathR/AI-MemoryVerse/backend/.venv/bin/python"
+site-packages-path = [
+    "/Users/BharathR/AI-MemoryVerse/backend/.venv/lib/python3.11/site-packages"
+]
+site-package-path = [
+    "/Users/BharathR/AI-MemoryVerse/backend/.venv/lib/python3.11/site-packages"
+]
+search-path = [
+    "/Users/BharathR/AI-MemoryVerse/backend",
+    "/Users/BharathR/AI-MemoryVerse/backend/app",
+    "/Users/BharathR/AI-MemoryVerse/backend/tests"
+]
+
+[errors]
+missing-import = "ignore"

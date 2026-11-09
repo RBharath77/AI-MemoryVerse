@@ -11,10 +11,13 @@ from fastapi import HTTPException, status
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from sqlalchemy.orm.attributes import flag_modified
 
+from app.ai.agent_event_bus import AgentEventBus
+from app.ai.agent_guard import AgentToolExecutionGuard
 from app.ai.factory import get_llm_provider
-from app.ai.retrieval import HybridSearchEngine
 from app.ai.tools import ActionRiskLevel, ToolRegistry
+from app.core.config import settings
 from app.models.agent import (
     ActionApprovalStatus,
     AgentAction,
@@ -22,10 +25,8 @@ from app.models.agent import (
     APIToken,
     TaskStatus,
 )
-from app.models.graph import GraphEntity
-from app.models.memory import Memory, MemoryCategory, MemoryStatus
+from app.models.memory import Memory
 from app.schemas.agent import AgentTaskCreate, APITokenCreate
-from app.services.url_service import WebpageImporter
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +52,22 @@ class AgentService:
         await db.commit()
         await db.refresh(task)
 
-        # Run the initial autonomous step
+        # Dispatch autonomous step to Celery worker in production environments
+        if getattr(settings, "APP_ENV", "development") not in ("test", "testing"):
+            try:
+                from app.workers.tasks import execute_agent_step_task
+
+                async_res = execute_agent_step_task.delay(workspace_id, task.id)
+                task.extra_metadata["celery_task_id"] = async_res.id
+                flag_modified(task, "extra_metadata")
+                await db.commit()
+                return task
+            except Exception as e:
+                logger.warning(
+                    f"Could not dispatch agent step to Celery, falling back to synchronous: {e}"
+                )
+
+        # Fallback to local execution in test environment
         return await AgentService.execute_task_step(db, workspace_id, task.id)
 
     @staticmethod
@@ -102,11 +118,60 @@ class AgentService:
         db: AsyncSession,
         workspace_id: str,
         task_id: str,
+        current_user_id: str | None = None,
+        is_admin_or_owner: bool = False,
+        reason: str = "Task cancelled by user.",
     ) -> AgentTask:
         task = await AgentService.get_task(db, workspace_id, task_id)
+        if current_user_id and task.user_id != current_user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to cancel this agent task.",
+            )
+
+        if task.status in (TaskStatus.COMPLETED, TaskStatus.CANCELLED):
+            return task
+
         task.status = TaskStatus.CANCELLED
+        task.result_summary = task.result_summary or f"Task cancelled: {reason}"
+
+        # State reconciliation: Mark any pending action checkpoints as REJECTED_BY_USER
+        q_actions = select(AgentAction).where(
+            AgentAction.task_id == task_id,
+            AgentAction.workspace_id == workspace_id,
+            AgentAction.approval_status == ActionApprovalStatus.PENDING_APPROVAL,
+        )
+        pending_actions = (await db.execute(q_actions)).scalars().all()
+        for act in pending_actions:
+            act.approval_status = ActionApprovalStatus.REJECTED_BY_USER
+            act.tool_output = {"error": f"Action cancelled due to task cancellation: {reason}"}
+
         await db.commit()
         await db.refresh(task)
+
+        # Publish cancellation event to AgentEventBus
+        await AgentEventBus.publish(
+            task_id=task.id,
+            event_type="task_cancelled",
+            data={
+                "task_id": task.id,
+                "status": "cancelled",
+                "reason": reason,
+                "cancelled_by": current_user_id,
+                "reconciled_pending_actions": len(pending_actions),
+            },
+        )
+
+        # Revoke Celery task if present
+        celery_task_id = task.extra_metadata.get("celery_task_id")
+        if celery_task_id:
+            try:
+                from app.workers.celery_app import celery_app
+
+                celery_app.control.revoke(celery_task_id, terminate=True)
+            except Exception as e:
+                logger.debug("Failed to revoke Celery task %s: %s", celery_task_id, e)
+
         return task
 
     @staticmethod
@@ -127,6 +192,15 @@ class AgentService:
             )
             await db.commit()
             await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_finished",
+                {
+                    "status": "completed",
+                    "result_summary": task.result_summary,
+                    "steps_taken": task.steps_taken,
+                },
+            )
             return task
 
         llm = get_llm_provider()
@@ -211,17 +285,41 @@ class AgentService:
                     "summary": f"Completed research on '{task.goal}'. All relevant steps executed.",
                 }
 
+        # Emit thought milestone
+        thought_text = (
+            parsed.get("thought")
+            or f"Evaluating step {task.steps_taken + 1} for goal: '{task.goal[:50]}'."
+        )
+        await AgentEventBus.publish(
+            task.id,
+            "thought",
+            {
+                "step": task.steps_taken + 1,
+                "thought": thought_text,
+                "timestamp": datetime.now(UTC).isoformat(),
+            },
+        )
+
         # 1. Check if agent finished
         if parsed.get("action") == "finish":
             task.status = TaskStatus.COMPLETED
             task.result_summary = parsed.get("summary") or "Task completed successfully."
             await db.commit()
             await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_finished",
+                {
+                    "status": "completed",
+                    "result_summary": task.result_summary,
+                    "steps_taken": task.steps_taken,
+                },
+            )
             return task
 
         # 2. Check tool execution
         tool_name = parsed.get("tool", "search_memories")
-        params = parsed.get("parameters", {})
+        raw_params = parsed.get("parameters", {})
         tool_def = ToolRegistry.get(tool_name)
 
         if not tool_def:
@@ -229,9 +327,56 @@ class AgentService:
             task.status = TaskStatus.FAILED
             await db.commit()
             await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_failed",
+                {"status": "failed", "error": task.error_message},
+            )
             return task
 
-        # 3. Check risk level for Human-In-The-Loop gating
+        # 3. Guardrail parameter clamping and validation
+        guard_res = AgentToolExecutionGuard.clamp_and_validate_params(tool_name, raw_params)
+        if not guard_res.is_valid:
+            task.error_message = guard_res.error or f"Invalid parameters for tool '{tool_name}'."
+            task.status = TaskStatus.FAILED
+            await db.commit()
+            await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_failed",
+                {"status": "failed", "error": task.error_message},
+            )
+            return task
+
+        params = guard_res.params
+
+        # 4. Guardrail loop and rate limits check
+        loop_err = AgentToolExecutionGuard.check_loop_and_rate_limits(task, tool_name, params)
+        if loop_err:
+            task.error_message = loop_err
+            task.status = TaskStatus.FAILED
+            await db.commit()
+            await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_failed",
+                {"status": "failed", "error": loop_err},
+            )
+            return task
+
+        await AgentEventBus.publish(
+            task.id,
+            "action_planned",
+            {
+                "step": task.steps_taken + 1,
+                "tool_name": tool_name,
+                "tool_input": params,
+                "risk_level": tool_def.risk_level.value,
+                "warnings": guard_res.warnings,
+            },
+        )
+
+        # 5. Check risk level for Human-In-The-Loop gating
         if tool_def.risk_level == ActionRiskLevel.HIGH:
             action = AgentAction(
                 task_id=task.id,
@@ -246,97 +391,38 @@ class AgentService:
             task.steps_taken += 1
             await db.commit()
             await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "awaiting_approval",
+                {
+                    "step": task.steps_taken,
+                    "action_id": action.id,
+                    "tool_name": tool_name,
+                    "tool_input": params,
+                    "risk_level": tool_def.risk_level.value,
+                },
+            )
             return task
 
-        # 4. Safe Tool Execution
-        start_t = time.perf_counter()
-        tool_output: dict[str, Any] = {}
+        # 6. Safe Tool Execution with Timeout Bounding
+        await AgentEventBus.publish(
+            task.id,
+            "tool_invoked",
+            {
+                "step": task.steps_taken + 1,
+                "tool_name": tool_name,
+                "started_at": datetime.now(UTC).isoformat(),
+            },
+        )
 
-        try:
-            if tool_name == "search_memories":
-                q_text = params.get("query", task.goal[:50])
-                results = await HybridSearchEngine.search(
-                    db=db,
-                    workspace_id=workspace_id,
-                    query=q_text,
-                    top_k=5,
-                    include_memories=True,
-                    include_documents=False,
-                )
-                tool_output = {
-                    "found_count": len(results),
-                    "items": [{"title": r.title, "content": r.content} for r in results],
-                }
-
-            elif tool_name == "search_documents":
-                q_text = params.get("query", task.goal[:50])
-                results = await HybridSearchEngine.search(
-                    db=db,
-                    workspace_id=workspace_id,
-                    query=q_text,
-                    top_k=5,
-                    include_memories=False,
-                    include_documents=True,
-                )
-                tool_output = {
-                    "found_count": len(results),
-                    "items": [{"title": r.title, "content": r.content} for r in results],
-                }
-
-            elif tool_name == "lookup_knowledge_graph":
-                e_name = params.get("entity_name", "")
-                q = select(GraphEntity).where(
-                    GraphEntity.workspace_id == workspace_id,
-                    GraphEntity.name.ilike(f"%{e_name}%"),
-                )
-                entity = (await db.execute(q)).scalar_one_or_none()
-                if entity:
-                    tool_output = {
-                        "name": entity.name,
-                        "entity_type": entity.entity_type.value,
-                        "description": entity.description,
-                        "mention_count": entity.mention_count,
-                        "connected_edges": (
-                            len(entity.outgoing_relationships) + len(entity.incoming_relationships)
-                        ),
-                    }
-                else:
-                    tool_output = {"found": False, "message": f"Entity '{e_name}' not in graph."}
-
-            elif tool_name == "fetch_web_url":
-                target_url = params.get("url", "")
-                web_res = await WebpageImporter.import_url(target_url)
-                tool_output = {
-                    "title": web_res["title"],
-                    "word_count": web_res["word_count"],
-                    "content_snippet": web_res["content"][:1000],
-                }
-
-            elif tool_name == "propose_memory":
-                content = params.get("content", "").strip()
-                if content:
-                    mem = Memory(
-                        workspace_id=workspace_id,
-                        user_id=task.user_id,
-                        content=content,
-                        category=MemoryCategory(params.get("category", "semantic")),
-                        importance=params.get("importance", 5),
-                        status=MemoryStatus.APPROVED,
-                    )
-                    db.add(mem)
-                    await db.flush()
-                    tool_output = {"memory_id": mem.id, "status": "approved"}
-                else:
-                    tool_output = {"error": "Content cannot be empty."}
-
-            else:
-                tool_output = {"message": f"Tool '{tool_name}' executed successfully."}
-
-        except Exception as e:
-            logger.error("Agent tool execution failed: %s", e)
-            tool_output = {"error": str(e)}
-
-        latency_ms = round((time.perf_counter() - start_t) * 1000.0, 2)
+        tool_output, latency_ms = await AgentToolExecutionGuard.execute_tool_with_timeout(
+            tool_name=tool_name,
+            params=params,
+            workspace_id=workspace_id,
+            task=task,
+            db=db,
+            timeout_seconds=15.0,
+        )
 
         action = AgentAction(
             task_id=task.id,
@@ -353,6 +439,19 @@ class AgentService:
         await db.commit()
         await db.refresh(task)
 
+        await AgentEventBus.publish(
+            task.id,
+            "step_completed",
+            {
+                "step": task.steps_taken,
+                "action_id": action.id,
+                "tool_name": tool_name,
+                "output": tool_output,
+                "latency_ms": latency_ms,
+                "status": action.approval_status.value,
+            },
+        )
+
         # Automatically conclude or run next step if safe
         if task.steps_taken >= 2 and not task.result_summary:
             task.status = TaskStatus.COMPLETED
@@ -362,6 +461,15 @@ class AgentService:
             )
             await db.commit()
             await db.refresh(task)
+            await AgentEventBus.publish(
+                task.id,
+                "task_finished",
+                {
+                    "status": "completed",
+                    "result_summary": task.result_summary,
+                    "steps_taken": task.steps_taken,
+                },
+            )
             return task
 
         return task
@@ -372,6 +480,7 @@ class AgentService:
         workspace_id: str,
         action_id: str,
         user_id: str,
+        is_admin_or_owner: bool = False,
     ) -> AgentTask:
         """User explicitly approves a gated high-risk action checkpoint."""
         q = select(AgentAction).where(
@@ -383,6 +492,13 @@ class AgentService:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Agent action not found or unauthorized.",
+            )
+
+        task = await AgentService.get_task(db, workspace_id, action.task_id)
+        if task.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to approve actions on this agent task.",
             )
 
         if action.approval_status != ActionApprovalStatus.PENDING_APPROVAL:
@@ -406,9 +522,25 @@ class AgentService:
                 tool_output = {"error": "Target memory not found."}
 
         elif action.tool_name == "trigger_webhook":
+            target_url = action.tool_input.get("target_url")
+            payload = action.tool_input.get("payload", {})
+            secret = action.tool_input.get("secret", "mv_default_webhook_secret_key")
+            if target_url:
+                # SSRF Protection: validate external webhook URL against private/metadata IPs
+                from app.core.ssrf import validate_url_safe
+
+                validate_url_safe(target_url)
+
+            from app.core.webhook import WebhookSignatureService
+
+            payload_bytes = json.dumps(payload, sort_keys=True).encode("utf-8")
+            sig_header, ts = WebhookSignatureService.sign_payload(payload_bytes, secret)
+
             tool_output = {
                 "webhook_dispatched": True,
-                "target_url": action.tool_input.get("target_url"),
+                "target_url": target_url,
+                "signature_header": sig_header,
+                "timestamp": ts,
                 "status": "delivered",
             }
         else:
@@ -419,7 +551,6 @@ class AgentService:
         action.tool_output = tool_output
         action.execution_latency_ms = latency_ms
 
-        task = await AgentService.get_task(db, workspace_id, action.task_id)
         task.status = TaskStatus.COMPLETED
         task.result_summary = (
             f"Action '{action.tool_name}' was approved and executed. "
@@ -427,6 +558,28 @@ class AgentService:
         )
         await db.commit()
         await db.refresh(task)
+
+        await AgentEventBus.publish(
+            task.id,
+            "step_completed",
+            {
+                "step": task.steps_taken,
+                "action_id": action.id,
+                "tool_name": action.tool_name,
+                "output": tool_output,
+                "latency_ms": latency_ms,
+                "status": action.approval_status.value,
+            },
+        )
+        await AgentEventBus.publish(
+            task.id,
+            "task_finished",
+            {
+                "status": "completed",
+                "result_summary": task.result_summary,
+                "steps_taken": task.steps_taken,
+            },
+        )
         return task
 
     @staticmethod
@@ -436,6 +589,7 @@ class AgentService:
         action_id: str,
         user_id: str,
         reason: str = "Rejected by user.",
+        is_admin_or_owner: bool = False,
     ) -> AgentTask:
         """User rejects a gated high-risk action checkpoint."""
         q = select(AgentAction).where(
@@ -449,14 +603,41 @@ class AgentService:
                 detail="Agent action not found or unauthorized.",
             )
 
+        task = await AgentService.get_task(db, workspace_id, action.task_id)
+        if task.user_id != user_id and not is_admin_or_owner:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Insufficient permissions to reject actions on this agent task.",
+            )
+
         action.approval_status = ActionApprovalStatus.REJECTED_BY_USER
         action.tool_output = {"rejected": True, "reason": reason}
 
-        task = await AgentService.get_task(db, workspace_id, action.task_id)
         task.status = TaskStatus.COMPLETED
         task.result_summary = f"Consequential action was rejected by user. {reason}"
         await db.commit()
         await db.refresh(task)
+
+        await AgentEventBus.publish(
+            task.id,
+            "step_completed",
+            {
+                "step": task.steps_taken,
+                "action_id": action.id,
+                "tool_name": action.tool_name,
+                "output": action.tool_output,
+                "status": action.approval_status.value,
+            },
+        )
+        await AgentEventBus.publish(
+            task.id,
+            "task_finished",
+            {
+                "status": "completed",
+                "result_summary": task.result_summary,
+                "steps_taken": task.steps_taken,
+            },
+        )
         return task
 
     # API Token Management
@@ -467,6 +648,22 @@ class AgentService:
         user_id: str,
         data: APITokenCreate,
     ) -> tuple[APIToken, str]:
+        # Enforce maximum active token quota per workspace
+        active_count_q = (
+            select(func.count())
+            .select_from(APIToken)
+            .where(
+                APIToken.workspace_id == workspace_id,
+                APIToken.is_revoked.is_(False),
+            )
+        )
+        active_count = (await db.execute(active_count_q)).scalar_one()
+        if active_count >= 10:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Maximum limit of active API tokens (10) reached for this workspace. Please revoke unused tokens.",
+            )
+
         raw_secret = f"mv_live_{secrets.token_urlsafe(32)}"
         token_hash = hashlib.sha256(raw_secret.encode("utf-8")).hexdigest()
         prefix = raw_secret[:12]
