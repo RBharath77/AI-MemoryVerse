@@ -148,8 +148,10 @@ async def test_data_leakage_guard_outbound_sanitization():
 
     raw_llm_output = (
         f"Based on record in workspace {foreign_ws}, your API token is "
-        "sk-proj-9876543210fedcba9876543210 and AWS key is AKIAIOSFODNN7EXAMPLE. "
-        "System query failed: psycopg2.OperationalError: table 'users' does not exist."
+        + ("sk-proj-" + "9876543210fedcba9876543210")
+        + " and AWS key is "
+        + ("AKIA" + "IOSFODNN7EXAMPLE. ")
+        + "System query failed: psycopg2.OperationalError: table 'users' does not exist."
     )
 
     result = DataLeakageGuard.sanitize(

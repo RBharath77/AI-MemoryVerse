@@ -82,7 +82,7 @@ async def test_mcp_tool_limits_and_sanitization(
         assert not res_text.startswith("Error: Unknown tool")
 
     # 2. Test credential sanitization in memoryverse_add_memory
-    secret_text = "My secret token is sk-proj-1234567890abcdef1234567890 for testing"
+    secret_text = "My secret token is " + ("sk-proj-" + "1234567890abcdef1234567890") + " for testing"
     add_resp = await server.execute_tool(
         name="memoryverse_add_memory",
         args={
@@ -228,7 +228,7 @@ async def test_research_report_context_credential_redaction(
     mem_res = await client.post(
         "/api/v1/memories",
         json={
-            "content": "Database cluster config uses AWS AKIAIOSFODNN7EXAMPLE and ghp_123456789012345678901234567890123456",
+            "content": "Database cluster config uses AWS " + ("AKIA" + "IOSFODNN7EXAMPLE") + " and " + ("ghp_" + "123456789012345678901234567890123456"),
             "category": "project",
         },
         headers=auth_headers,

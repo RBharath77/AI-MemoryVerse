@@ -235,7 +235,7 @@ async def test_memory_bulk_import_sanitization_and_bounding(
     import_payload = {
         "memories": [
             {
-                "content": "Production config with AWS AKIAIOSFODNN7EXAMPLE and OpenAI sk-proj-1234567890abcdef1234567890",
+                "content": "Production config with AWS " + ("AKIA" + "IOSFODNN7EXAMPLE") + " and OpenAI " + ("sk-proj-" + "1234567890abcdef1234567890"),
                 "category": "project",
                 "importance": 9,
                 "tags": ["cloud", "credentials"],

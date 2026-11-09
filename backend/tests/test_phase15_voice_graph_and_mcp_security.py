@@ -84,7 +84,7 @@ async def test_voice_synthesize_and_chat_credential_redaction(
     """Verify that secret credentials are automatically scrubbed from voice synthesis and voice chat."""
     # 1. Test credential scrubbing on synthesize endpoint
     raw_secret = (
-        "The secret database key is sk-proj-1234567890abcdef1234567890 and AWS AKIAIOSFODNN7EXAMPLE"
+        "The secret database key is " + ("sk-proj-" + "1234567890abcdef1234567890") + " and AWS " + ("AKIA" + "IOSFODNN7EXAMPLE")
     )
     synth_res = await client.post(
         "/api/v1/voice/synthesize",

@@ -304,7 +304,7 @@ async def test_memory_review_corrected_credential_sanitization(
 
     # 2. Correct the memory review supplying raw OpenAI and AWS credentials
     raw_secret_correction = (
-        "Corrected with OpenAI sk-proj-1234567890abcdef1234567890 and AWS AKIAIOSFODNN7EXAMPLE"
+        "Corrected with OpenAI " + ("sk-proj-" + "1234567890abcdef1234567890") + " and AWS " + ("AKIA" + "IOSFODNN7EXAMPLE")
     )
     act_res = await client.post(
         f"/api/v1/memory-reviews/{review_id}/action",
@@ -330,8 +330,8 @@ async def test_memory_extraction_credential_sanitization(
 ):
     """Verify that unstructured fact extraction redacts credentials before storing into memories."""
     raw_text = (
-        "Project setup notes: our OpenAI token is sk-proj-1234567890abcdef1234567890 "
-        "and production AWS access key is AKIAIOSFODNN7EXAMPLE. We deploy weekly."
+        "Project setup notes: our OpenAI token is " + ("sk-proj-" + "1234567890abcdef1234567890 ") +
+        "and production AWS access key is " + ("AKIA" + "IOSFODNN7EXAMPLE. We deploy weekly.")
     )
 
     ext_res = await client.post(

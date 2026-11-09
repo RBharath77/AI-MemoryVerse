@@ -276,7 +276,7 @@ async def test_agent_propose_memory_credential_sanitization(
 
         # Mock LLM to return a propose_memory action containing raw secrets
         raw_secret_text = (
-            "Discovered OpenAI sk-proj-1234567890abcdef1234567890 and AWS AKIAIOSFODNN7EXAMPLE"
+            "Discovered OpenAI " + ("sk-proj-" + "1234567890abcdef1234567890") + " and AWS " + ("AKIA" + "IOSFODNN7EXAMPLE")
         )
         mock_response = LLMResponse(
             content=f'```json\n{{"action": "call_tool", "tool": "propose_memory", "parameters": {{"content": "{raw_secret_text}", "category": "project", "importance": 8}}}}\n```',

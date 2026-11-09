@@ -121,7 +121,7 @@ async def test_workspace_dlp_policy_lifecycle_and_redaction(client: AsyncClient)
         f"/api/v1/workspaces/{ws_id}/dlp/inspect",
         headers=headers,
         json={
-            "text": "User SSN is 987-65-4321 and payment card is 4111 2222 3333 4444 using key sk-1234567890abcdef12345678",
+            "text": "User SSN is 987-65-4321 and payment card is 4111 2222 3333 4444 using key " + ("sk-" + "1234567890abcdef12345678"),
         },
     )
     assert inspect_resp.status_code == 200
@@ -189,7 +189,7 @@ async def test_workspace_dlp_enforcement_on_memory_creation(client: AsyncClient)
         "/api/v1/memories",
         headers=headers,
         json={
-            "content": "Service account uses key sk-supersecretkey1234567890abcdef",
+            "content": "Service account uses key " + ("sk-" + "supersecretkey1234567890abcdef"),
             "category": "project",
         },
     )

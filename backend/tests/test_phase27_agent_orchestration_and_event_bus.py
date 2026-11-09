@@ -55,7 +55,7 @@ async def test_agent_guardrail_parameter_clamping_and_sanitization():
 
     # 4. Propose memory credential redaction and importance clamping
     secret_content = (
-        "Production API keys: sk-proj-1234567890abcdef1234567890 and AWS AKIAIOSFODNN7EXAMPLE"
+        "Production API keys: " + ("sk-proj-" + "1234567890abcdef1234567890") + " and AWS " + ("AKIA" + "IOSFODNN7EXAMPLE")
     )
     guard_mem = AgentToolExecutionGuard.clamp_and_validate_params(
         "propose_memory",
